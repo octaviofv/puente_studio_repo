@@ -19,11 +19,11 @@
  *
  * Requisitos:
  *   - Node.js 14+ (sin dependencias externas)
- *   - PUENTE_TOKEN en el archivo .env de la raíz del proyecto
+ *   - STUDIO_KEY en el archivo .env de la raíz del proyecto
  *
  * Variables de entorno leídas desde .env:
- *   PUENTE_TOKEN    — Bearer Token JWT de tu cuenta Puente OS (obligatorio)
- *   PUENTE_BASE_URL — URL base de la API (opcional, tiene valor por defecto)
+ *   STUDIO_KEY — Platform API Key de Puente Studio (puente_studio_xxx) (obligatorio)
+ *   BASE_URL   — URL base de la API (opcional, tiene valor por defecto)
  */
 
 'use strict';
@@ -71,12 +71,12 @@ function loadEnv(envPath) {
 // ─── HTTP helper ──────────────────────────────────────────────────────────────
 
 /**
- * Hace un GET HTTP/HTTPS con autenticación Bearer y retorna el JSON parseado.
+ * Hace un GET HTTP/HTTPS con autenticación X-API-Key y retorna el JSON parseado.
  * @param {string} url
- * @param {string} token
+ * @param {string} apiKey - STUDIO_KEY (puente_studio_xxx)
  * @returns {Promise<{ status: number, data: any }>}
  */
-function fetchJSON(url, token) {
+function fetchJSON(url, apiKey) {
     return new Promise((resolve, reject) => {
         const parsed = new URL(url);
         const lib = parsed.protocol === 'https:' ? https : http;
@@ -86,7 +86,7 @@ function fetchJSON(url, token) {
             path: parsed.pathname + parsed.search,
             method: 'GET',
             headers: {
-                'Authorization': `Bearer ${token}`,
+                'X-API-Key': apiKey,
                 'Content-Type': 'application/json',
             },
         };
@@ -154,25 +154,25 @@ async function main() {
 
     // Cargar configuración desde .env
     const env = loadEnv(path.join(rootDir, '.env'));
-    const token = env.PUENTE_TOKEN;
-    const base = (env.PUENTE_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
+    const studioKey = env.STUDIO_KEY;
+    const base = (env.BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '');
 
-    if (!token) {
-        console.error('\n❌  No se encontró PUENTE_TOKEN en el archivo .env');
-        console.error('    Asegúrate de copiar .env.example a .env y completarlo.\n');
+    if (!studioKey || studioKey === 'puente_studio_') {
+        console.error('\n❌  No se encontró STUDIO_KEY válida en el archivo .env');
+        console.error('    Asegúrate de copiar .env.example a .env y completar STUDIO_KEY.\n');
         process.exit(1);
     }
 
     // Fetch
-    const url = `${base}/get_artefacto/${artefactoId}`;
+    const url = `${base}/studio/artefactos/${artefactoId}`;
     console.log(`\n🔍  Obteniendo artefacto ID ${artefactoId}...`);
 
-    const { status, data } = await fetchJSON(url, token);
+    const { status, data } = await fetchJSON(url, studioKey);
 
     // Errores HTTP
     if (status === 401) {
-        console.error('\n❌  Error 401 — Token inválido o expirado.');
-        console.error('    Actualiza PUENTE_TOKEN en tu archivo .env.\n');
+        console.error('\n❌  Error 401 — STUDIO_KEY inválida o revocada.');
+        console.error('    Genera una nueva desde app.puente.xyz → Configuración y actualiza .env.\n');
         process.exit(1);
     }
     if (status === 403) {
@@ -256,7 +256,7 @@ async function main() {
     console.log(`\n📝  Próximos pasos:`);
     console.log(`    1. Edita los archivos en ${path.relative(rootDir, outputDir)}/`);
     console.log(`    2. Convierte a JSON:   node APP/files_to_json.js ./APP/files ./APP/output.json`);
-    console.log(`    3. Sube los cambios:   curl -X PUT $PUENTE_BASE_URL/update_artefacto/${artefactoId} ...`);
+    console.log(`    3. Sube los cambios:   curl -X PUT $BASE_URL/studio/artefactos/${artefactoId} -H "X-API-Key: $STUDIO_KEY" ...`);
     console.log('');
 }
 
