@@ -27,7 +27,8 @@ X-API-Key: {STUDIO_KEY}
 | Acción | Método | Endpoint |
 |--------|--------|----------|
 | Listar apps | GET | `{BASE_URL}/studio/artefactos` |
-| Obtener app | GET | `{BASE_URL}/studio/artefactos/{id}` |
+| Obtener app (código completo) | GET | `{BASE_URL}/studio/artefactos/{id}` |
+| Obtener metadatos + public_id | GET | `{BASE_URL}/studio/artefactos/{id}/meta` |
 | Crear app | POST | `{BASE_URL}/studio/artefactos` |
 | Actualizar app | PUT | `{BASE_URL}/studio/artefactos/{id}` |
 | Listar tablas | GET | `{BASE_URL}/studio/tablas` |
@@ -41,6 +42,8 @@ X-API-Key: {STUDIO_KEY}
 | Conceder acceso | POST | `{BASE_URL}/studio/artefactos/{id}/tablas-acceso` |
 | Actualizar permisos | PUT | `{BASE_URL}/studio/artefactos/{id}/tablas-acceso/{tabla_id}` |
 | Revocar acceso | DELETE | `{BASE_URL}/studio/artefactos/{id}/tablas-acceso/{tabla_id}` |
+
+> Usa siempre `/meta` para obtener `public_id`, `slug` y `fecha_creacion` sin descargar el código fuente completo.
 
 ---
 
@@ -158,11 +161,36 @@ El campo `app_content` es un diccionario donde cada clave es la ruta del archivo
 GET {BASE_URL}/studio/artefactos
 ```
 
+### Obtener metadatos de una app (sin descargar el código) ⭐
+```http
+GET {BASE_URL}/studio/artefactos/{id}/meta
+```
+Retorna `id`, `titulo`, `descripcion`, `slug`, **`public_id`**, `equipo_id`, `empresa_id` y `fecha_creacion`. **Úsalo siempre que necesites el `public_id` o el link público** — es mucho más liviano que descargar el `app_content` completo.
+
+**Respuesta:**
+```json
+{
+  "request_id": "fdfa0630-33f2-4a8c-bcf0-b587cb478643",
+  "artefacto": {
+    "id": 711,
+    "titulo": "tracking mensajes rrss",
+    "descripcion": " ",
+    "slug": null,
+    "public_id": "562756c2-5463-4467-92c1-736d4093b0a2",
+    "equipo_id": 8,
+    "empresa_id": 8,
+    "fecha_creacion": "2026-04-22T18:25:07.326335+00:00"
+  }
+}
+```
+
+> 🔗 **Link público:** `https://app.puente.xyz/public/{public_id}/`
+
 ### Obtener una app (contenido completo)
 ```http
 GET {BASE_URL}/studio/artefactos/{id}
 ```
-Retorna el código fuente en JSON, o HTML si es una app legada.
+Retorna el código fuente en JSON, o HTML si es una app legada. **Evita este endpoint si solo necesitas metadatos** — descarga todo el `app_content`.
 
 ### Crear app
 ```http
@@ -679,6 +707,7 @@ node APP/pull_artefacto.js {id}         # descarga a APP/files/
 4. **Reportar IDs y keys inmediatamente** — al crear un artefacto o regenerar una key, muestra y guarda el `id`, `public_id` y `api_key` en la respuesta al usuario antes de continuar.
 5. **No usar STUDIO_KEY en código de frontend** — es una credencial privada. El frontend usa exclusivamente `puente_artifact_xxx`.
 6. **Proponer estructura antes de codificar** — si el usuario pide una app nueva, describe la arquitectura propuesta (vistas, tablas, componentes) y espera confirmación antes de generar código.
+7. **Usar `/meta` para el link público** — cuando el usuario pida el link o URL de una app, usa SIEMPRE `GET /studio/artefactos/{id}/meta` para obtener el `public_id` y construir `https://app.puente.xyz/public/{public_id}/`. Nunca uses el GET completo del artefacto solo para esto.
 
 ---
 
