@@ -26,11 +26,13 @@ X-API-Key: {STUDIO_KEY}
 
 | Acción | Método | Endpoint |
 |--------|--------|----------|
-| Listar apps | GET | `{BASE_URL}/studio/artefactos` |
-| Obtener app (código completo) | GET | `{BASE_URL}/studio/artefactos/{id}` |
-| Obtener metadatos + public_id | GET | `{BASE_URL}/studio/artefactos/{id}/meta` |
+| Listar apps (versión vigente) | GET | `{BASE_URL}/studio/artefactos` |
+| Obtener app por group_id (siempre vigente) | GET | `{BASE_URL}/studio/artefactos/group/{group_id}` |
+| Obtener metadatos por group_id (siempre vigente) | GET | `{BASE_URL}/studio/artefactos/group/{group_id}/meta` |
+| Obtener app (código completo, versión específica) | GET | `{BASE_URL}/studio/artefactos/{id}` |
+| Obtener metadatos + public_id (versión específica) | GET | `{BASE_URL}/studio/artefactos/{id}/meta` |
 | Crear app | POST | `{BASE_URL}/studio/artefactos` |
-| Actualizar app | PUT | `{BASE_URL}/studio/artefactos/{id}` |
+| Actualizar app (push) | PUT | `{BASE_URL}/studio/artefactos/group/{group_id}` |
 | Listar tablas | GET | `{BASE_URL}/studio/tablas` |
 | Crear tabla | POST | `{BASE_URL}/studio/tablas` |
 | Leer filas | GET | `{BASE_URL}/studio/tablas/{tabla_id}/datos` |
@@ -44,6 +46,7 @@ X-API-Key: {STUDIO_KEY}
 | Revocar acceso | DELETE | `{BASE_URL}/studio/artefactos/{id}/tablas-acceso/{tabla_id}` |
 
 > Usa siempre `/meta` para obtener `public_id`, `slug` y `fecha_creacion` sin descargar el código fuente completo.
+> Usa siempre el `group_id` para pushear y leer — es el identificador estable que no cambia entre versiones.
 
 ---
 
@@ -160,8 +163,56 @@ El campo `app_content` es un diccionario donde cada clave es la ruta del archivo
 ```http
 GET {BASE_URL}/studio/artefactos
 ```
+Retorna solo la versión vigente (`is_latest=TRUE`) de cada app. El primer campo de cada item es el `artefacto_group_id` estable:
+```json
+{
+  "equipo_id": 8,
+  "total": 2,
+  "data": [
+    {
+      "artefacto_group_id": "b8d4b90b-66e9-48d8-94c9-371598528044",
+      "id": 101,
+      "version": 6,
+      "is_latest": true,
+      "titulo": "Mi App",
+      "descripcion": "...",
+      "empresa_id": 8,
+      "equipo_id": 8,
+      "fecha_creacion": "2026-06-01T12:00:00+00:00"
+    }
+  ]
+}
+```
+> 💡 **El `artefacto_group_id` es tu identificador principal** — úsalo para todos los pushes. El `id` numérico es solo referencial y cambia con cada versión.
 
-### Obtener metadatos de una app (sin descargar el código) ⭐
+### Obtener app por `group_id` (siempre vigente) ⭐
+```http
+GET {BASE_URL}/studio/artefactos/group/{group_id}
+```
+Retorna el código fuente (`app_content`) de la versión `is_latest=TRUE`. Usa este endpoint cuando tienes el `group_id` guardado y quieres el contenido actual sin importar cuántas versiones se hayan creado.
+
+### Obtener metadatos por `group_id` (siempre vigente) ⭐
+```http
+GET {BASE_URL}/studio/artefactos/group/{group_id}/meta
+```
+Retorna los metadatos de la versión vigente: `id` actual, `version`, `public_id`, `slug`, `sharing_mode` — sin descargar el código.
+
+```json
+{
+  "artefacto": {
+    "id": 101,
+    "artefacto_group_id": "b8d4b90b-66e9-48d8-94c9-371598528044",
+    "version": 6,
+    "is_latest": true,
+    "titulo": "Mi App",
+    "public_id": "562756c2-5463-4467-92c1-736d4093b0a2",
+    "slug": null,
+    "sharing_mode": null
+  }
+}
+```
+
+### Obtener metadatos de una app por `id` (versión específica) ⭐
 ```http
 GET {BASE_URL}/studio/artefactos/{id}/meta
 ```
@@ -186,11 +237,27 @@ Retorna `id`, `titulo`, `descripcion`, `slug`, **`public_id`**, `equipo_id`, `em
 
 > 🔗 **Link público:** `https://app.puente.xyz/public/{public_id}/`
 
-### Obtener una app (contenido completo)
+### Obtener una app por `id` (contenido completo, versión específica)
 ```http
 GET {BASE_URL}/studio/artefactos/{id}
 ```
 Retorna el código fuente en JSON, o HTML si es una app legada. **Evita este endpoint si solo necesitas metadatos** — descarga todo el `app_content`.
+
+### Modelo de versiones
+
+Cada push con `app_content` crea una **nueva versión**:
+
+| id | version | is_latest | Qué pasó |
+|----|---------|-----------|----------|
+| 88 | 1 | FALSE | versión original |
+| 89 | 2 | FALSE | primer push |
+| 100 | 3 | **TRUE** | último push |
+
+- El `artefacto_group_id` **nunca cambia** — es el ancla entre todas las versiones.
+- Solo hay **una** fila con `is_latest=TRUE` por grupo en todo momento.
+- Las versiones anteriores no se eliminan — quedan como historial.
+- Para pushear correctamente usa siempre `PUT /studio/artefactos/group/{group_id}`, que resuelve internamente la versión vigente antes de crear la nueva.
+
 
 ### Crear app
 ```http
@@ -213,14 +280,17 @@ Content-Type: application/json
 
 > 🔐 **Al crear, guarda de inmediato el `id`, `public_id` y `api_key` de la respuesta. La `api_key` solo se muestra UNA vez.**
 
-### Actualizar app
+### Actualizar app (push) — siempre por `group_id`
 
-> ⚠️ **CRÍTICO — DEBES enviar el `app_content` COMPLETO en cada PUT.**
+> ⚠️ **CRÍTICO — El único endpoint de actualización es `PUT /studio/artefactos/group/{group_id}`.**
+> El `id` numérico cambia con cada versión nueva. El `group_id` es estable para siempre.
+
+> ⚠️ **DEBES enviar el `app_content` COMPLETO en cada PUT.**
 > La API reemplaza el objeto entero. Si envías solo los archivos modificados, **los demás archivos serán eliminados permanentemente.**
 > Flujo seguro: GET → modifica en memoria → PUT con todo el contenido.
 
 ```http
-PUT {BASE_URL}/studio/artefactos/{id}
+PUT {BASE_URL}/studio/artefactos/group/{group_id}
 Content-Type: application/json
 
 {
@@ -229,7 +299,23 @@ Content-Type: application/json
   "app_content": { ... TODOS los archivos ... }
 }
 ```
-Solo envía los campos de metadatos que quieres cambiar (titulo, descripcion son opcionales). `app_content` siempre debe ser completo si se incluye.
+Solo envía los campos de metadatos que quieres cambiar (`titulo`, `descripcion` son opcionales). `app_content` siempre debe ser completo si se incluye.
+
+**Respuesta:**
+```json
+{
+  "message": "Artefacto actualizado",
+  "group_id": "b8d4b90b-66e9-48d8-94c9-371598528044",
+  "data": {
+    "id": 101,
+    "artefacto_group_id": "b8d4b90b-66e9-48d8-94c9-371598528044",
+    "version": 6,
+    "is_latest": true,
+    "titulo": "Nuevo nombre"
+  }
+}
+```
+> Cada push con `app_content` crea una nueva versión (`version` se incrementa). El `group_id` nunca cambia.
 
 ---
 
@@ -707,7 +793,9 @@ node APP/pull_artefacto.js {id}         # descarga a APP/files/
 4. **Reportar IDs y keys inmediatamente** — al crear un artefacto o regenerar una key, muestra y guarda el `id`, `public_id` y `api_key` en la respuesta al usuario antes de continuar.
 5. **No usar STUDIO_KEY en código de frontend** — es una credencial privada. El frontend usa exclusivamente `puente_artifact_xxx`.
 6. **Proponer estructura antes de codificar** — si el usuario pide una app nueva, describe la arquitectura propuesta (vistas, tablas, componentes) y espera confirmación antes de generar código.
-7. **Usar `/meta` para el link público** — cuando el usuario pida el link o URL de una app, usa SIEMPRE `GET /studio/artefactos/{id}/meta` para obtener el `public_id` y construir `https://app.puente.xyz/public/{public_id}/`. Nunca uses el GET completo del artefacto solo para esto.
+7. **Usar `/meta` para el link público** — cuando el usuario pida el link o URL de una app, usa SIEMPRE `GET /studio/artefactos/group/{group_id}/meta` o `GET /studio/artefactos/{id}/meta` para obtener el `public_id` y construir `https://app.puente.xyz/public/{public_id}/`. Nunca uses el GET completo del artefacto solo para esto.
+8. **Pushear siempre por `group_id`** — el único endpoint de actualización es `PUT /studio/artefactos/group/{group_id}`. Nunca uses el `id` numérico para pushes, ya que cambia con cada versión nueva. El `group_id` es estable para siempre.
+9. **Reportar y guardar el `group_id`** — al crear un artefacto, muestra el `artefacto_group_id` al usuario e indícale que lo guarde. Es el identificador que necesitará para todos los pushes futuros.
 
 ---
 
