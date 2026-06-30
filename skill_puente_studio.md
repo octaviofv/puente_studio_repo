@@ -37,6 +37,7 @@ X-API-Key: {STUDIO_KEY}
 | Crear tabla | POST | `{BASE_URL}/studio/tablas` |
 | Leer filas | GET | `{BASE_URL}/studio/tablas/{tabla_id}/datos` |
 | Insertar fila | POST | `{BASE_URL}/studio/tablas/{tabla_id}/datos` |
+| Actualizar fila | PUT | `{BASE_URL}/studio/tablas/{tabla_id}/datos/{fila_id}` |
 | Bulk insert | POST | `{BASE_URL}/studio/tablas/{tabla_id}/datos/bulk` |
 | Ver API key | GET | `{BASE_URL}/studio/artefactos/{id}/api-key` |
 | Regenerar API key | POST | `{BASE_URL}/studio/artefactos/{id}/api-key/regenerate` |
@@ -57,7 +58,7 @@ X-API-Key: {STUDIO_KEY}
 | Contexto | Endpoints | Autenticación |
 |----------|-----------|---------------|
 | **Gestión** (tú como agente) | `/studio/...` | `X-API-Key: {STUDIO_KEY}` |
-| **La app publicada** (frontend del usuario) | `/public/artefacto/{id}/...` | `X-API-Key: puente_artifact_xxx` |
+| **La app publicada** (frontend del usuario) | `/public/artefacto/{artefacto_group_id}/...` | `X-API-Key: puente_artifact_xxx` |
 
 Nunca uses la `STUDIO_KEY` dentro del código de una app publicada — es una credencial privada de administración.
 
@@ -77,6 +78,7 @@ Nunca uses la `STUDIO_KEY` dentro del código de una app publicada — es una cr
 - **Actualizar** el nombre o descripción de una tabla
 - **Leer** las filas de una tabla (paginado)
 - **Insertar** una fila
+- **Actualizar** una fila existente por su `fila_id`
 - **Insertar en masa** hasta 10 000 filas en una sola operación
 
 ---
@@ -384,6 +386,42 @@ Content-Type: application/json
 }
 ```
 
+### Actualizar una fila
+```http
+PUT {BASE_URL}/studio/tablas/{tabla_id}/datos/{fila_id}
+Content-Type: application/json
+
+{
+  "datos": {
+    "nombre_campo": "valor actualizado",
+    "cantidad": 42,
+    "fecha": "2026-06-24",
+    "activo": false
+  }
+}
+```
+
+Actualiza **completamente** los datos de la fila indicada. Los datos se validan contra la `configuracion_columnas` de la tabla antes de persistir.
+
+> ⚠️ **Reemplazo completo:** el `fila_data` se reemplaza entero. Incluye todos los campos que deben quedar en la fila, no solo los que cambían.
+
+**Respuesta (200 OK):**
+```json
+{
+  "id": "uuid-fila",
+  "tabla_id": "uuid-tabla",
+  "fila_data": { "nombre_campo": "valor actualizado", "cantidad": 42, "fecha": "2026-06-24", "activo": false },
+  "created_at": "2026-06-20T10:00:00Z",
+  "created_by_user_id": null
+}
+```
+
+**Errores posibles:**
+| Código | Causa |
+|--------|-------|
+| `404` | Tabla o fila no encontrada |
+| `422` | Datos con formato incorrecto según la estructura de columnas |
+
 ### Insertar muchas filas (bulk)
 ```http
 POST {BASE_URL}/studio/tablas/{tabla_id}/datos/bulk
@@ -518,21 +556,22 @@ DELETE {BASE_URL}/studio/artefactos/{id}/tablas-acceso/{tabla_id}
 
 Estos endpoints son los que usa la **app publicada** en el frontend para operar con sus tablas. Se autentican con la API key del artefacto.
 
-**Base URL:** `{BASE_URL}/public/artefacto/{artefacto_id}`
+**Base URL:** `{BASE_URL}/public/artefacto/{artefacto_group_id}`
 
+> ⭐ **Usa siempre el `artefacto_group_id` (UUID) en la URL** — es estable entre versiones. 
 ```http
 X-API-Key: puente_artifact_xxxxxxxxxxxx
 ```
 
 ### Obtener metadatos de tabla
 ```http
-GET /public/artefacto/{artefacto_id}/tablas/{tabla_id}
+GET /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}
 ```
 **Permiso requerido:** `read`
 
 ### Listar filas
 ```http
-GET /public/artefacto/{artefacto_id}/tablas/{tabla_id}/datos?limit=50&offset=0
+GET /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}/datos?limit=50&offset=0
 ```
 **Permiso requerido:** `read`
 
@@ -589,7 +628,7 @@ X-RateLimit-Reset: 1709988123
 
 ### Insertar fila
 ```http
-POST /public/artefacto/{artefacto_id}/tablas/{tabla_id}/dato
+POST /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}/dato
 Content-Type: application/json
 
 { "datos": { "campo": "valor", "monto": 1000, "fecha": "2026-04-29" } }
@@ -598,7 +637,7 @@ Content-Type: application/json
 
 ### Actualizar fila
 ```http
-PUT /public/artefacto/{artefacto_id}/tablas/{tabla_id}/dato/{fila_id}
+PUT /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}/dato/{fila_id}
 Content-Type: application/json
 
 { "datos": { "monto": 2000 } }
@@ -607,7 +646,7 @@ Content-Type: application/json
 
 ### Eliminar fila
 ```http
-DELETE /public/artefacto/{artefacto_id}/tablas/{tabla_id}/dato/{fila_id}
+DELETE /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}/dato/{fila_id}
 ```
 **Permiso requerido:** `delete`
 
@@ -725,21 +764,26 @@ curl -X POST {BASE_URL}/studio/artefactos \
 ### Crear una tabla y cargar datos
 
 ```
-1. POST /studio/tablas                 → guarda tabla_id
-2. POST /studio/tablas/{id}/datos/bulk → carga los datos (máx 10 000 filas)
-3. GET  /studio/tablas/{id}/datos      → confirma que llegaron
+1. POST /studio/tablas                           → guarda tabla_id
+2. POST /studio/tablas/{id}/datos/bulk           → carga los datos (máx 10 000 filas)
+3. GET  /studio/tablas/{id}/datos                → confirma que llegaron
+4. PUT  /studio/tablas/{id}/datos/{fila_id}      → actualiza una fila específica (si necesario)
 ```
 
 ---
 
 ## Ejemplo en JavaScript (dentro de la app publicada)
 
+> 🔑 El placeholder `__PUENTE_ARTEFACTO_ID__` se inyecta automáticamente como el `artefacto_group_id` (UUID estable). El código generado siempre usa el UUID, que no cambia entre versiones.
+
 ```javascript
 // Constantes de configuración — embebidas en el código de la app
-const API_KEY      = 'puente_artifact_xxxxxxxxxxxx';
-const ARTEFACTO_ID = 123;
-const TABLA_ID     = 'uuid-de-la-tabla';
-const BASE         = `{BASE_URL}/public/artefacto/${ARTEFACTO_ID}`;
+// __PUENTE_API_KEY__ y __PUENTE_ARTEFACTO_ID__ son placeholders que el servidor sustituye
+// automáticamente al publicar. Nunca los reemplaces a mano con valores reales.
+const API_KEY            = '__PUENTE_API_KEY__';       // → se inyecta como puente_artifact_xxx
+const ARTEFACTO_GROUP_ID = '__PUENTE_ARTEFACTO_ID__';  // → se inyecta como UUID estable del grupo
+const TABLA_ID           = 'uuid-de-la-tabla';         // ← este sí va hardcodeado
+const BASE               = `{BASE_URL}/public/artefacto/${ARTEFACTO_GROUP_ID}`;
 
 // Leer datos con filtro
 const res = await fetch(
@@ -825,11 +869,12 @@ node APP/pull_artefacto.js {id}         # descarga a APP/files/
 | Error | Causa | Solución |
 |-------|-------|----------|
 | `401` API Key requerida | Falta header `X-API-Key` | Incluir `X-API-Key: puente_artifact_xxx` |
-| `401` API Key inválida | Key incorrecta, revocada o tipo incorrecto | Verificar o regenerar la key |
-| `401` API Key no autorizada | La key pertenece a otro artefacto | Usar la key correcta para ese artefacto |
+| `403` API Key inválida | Key incorrecta, revocada o tipo incorrecto | Verificar o regenerar la key |
+| `403` API Key no autorizada | La key pertenece a otro `artefacto_group_id` | Usar la key correcta para ese artefacto |
 | `403` Acceso no configurado | El artefacto no tiene acceso a esa tabla | `POST /studio/artefactos/{id}/tablas-acceso` |
 | `403` Permiso insuficiente | Los permisos no incluyen la acción requerida | `PUT /studio/artefactos/{id}/tablas-acceso/{tabla_id}` |
 | `429` Rate limit excedido | Demasiados requests en la ventana de tiempo | Esperar `Retry-After` segundos con backoff |
+| `400` artefacto_id inválido | El valor en la URL no es UUID ni entero numérico | Usar el `artefacto_group_id` (UUID) del artefacto |
 | `400` Datos inválidos | Tipos incorrectos o campos requeridos faltantes | Revisar el esquema de columnas de la tabla |
 
 
