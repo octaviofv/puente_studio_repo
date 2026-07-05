@@ -774,15 +774,12 @@ curl -X POST {BASE_URL}/studio/artefactos \
 
 ## Ejemplo en JavaScript (dentro de la app publicada)
 
-> 🔑 El placeholder `__PUENTE_ARTEFACTO_ID__` se inyecta automáticamente como el `artefacto_group_id` (UUID estable). El código generado siempre usa el UUID, que no cambia entre versiones.
-
 ```javascript
-// Constantes de configuración — embebidas en el código de la app
-// __PUENTE_API_KEY__ y __PUENTE_ARTEFACTO_ID__ son placeholders que el servidor sustituye
-// automáticamente al publicar. Nunca los reemplaces a mano con valores reales.
-const API_KEY            = '__PUENTE_API_KEY__';       // → se inyecta como puente_artifact_xxx
-const ARTEFACTO_GROUP_ID = '__PUENTE_ARTEFACTO_ID__';  // → se inyecta como UUID estable del grupo
-const TABLA_ID           = 'uuid-de-la-tabla';         // ← este sí va hardcodeado
+// ARTEFACTO_GROUP_ID: usar el artefacto_group_id UUID — NUNCA el id numérico (cambia con cada push).
+// API_KEY: obtenida con POST /studio/artefactos/{id}/api-key/regenerate
+const API_KEY            = 'puente_art_xxxx.yyyy';                    // ← valor real hardcodeado
+const ARTEFACTO_GROUP_ID = 'b8d4b90b-66e9-48d8-94c9-371598528044';   // ← artefacto_group_id UUID
+const TABLA_ID           = 'uuid-de-la-tabla';                        // ← tabla_id UUID
 const BASE               = `{BASE_URL}/public/artefacto/${ARTEFACTO_GROUP_ID}`;
 
 // Leer datos con filtro
