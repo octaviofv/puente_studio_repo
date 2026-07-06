@@ -45,6 +45,9 @@ X-API-Key: {STUDIO_KEY}
 | Conceder acceso | POST | `{BASE_URL}/studio/artefactos/{id}/tablas-acceso` |
 | Actualizar permisos | PUT | `{BASE_URL}/studio/artefactos/{id}/tablas-acceso/{tabla_id}` |
 | Revocar acceso | DELETE | `{BASE_URL}/studio/artefactos/{id}/tablas-acceso/{tabla_id}` |
+| **Bulk insert público** | POST | `{BASE_URL}/public/artefacto/{group_id}/tablas/{tabla_id}/datos/bulk` |
+| **Bulk delete público** | DELETE | `{BASE_URL}/public/artefacto/{group_id}/tablas/{tabla_id}/datos/bulk` |
+| **Query avanzada público** | POST | `{BASE_URL}/public/artefacto/{group_id}/tablas/{tabla_id}/query` |
 
 > Usa siempre `/meta` para obtener `public_id`, `slug` y `fecha_creacion` sin descargar el código fuente completo.
 > Usa siempre el `group_id` para pushear y leer — es el identificador estable que no cambia entre versiones.
@@ -649,6 +652,175 @@ Content-Type: application/json
 DELETE /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}/dato/{fila_id}
 ```
 **Permiso requerido:** `delete`
+
+### Bulk Insert (insertar múltiples filas)
+```http
+POST /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}/datos/bulk
+Content-Type: application/json
+
+{
+  "filas": [
+    { "campo": "valor 1", "monto": 100 },
+    { "campo": "valor 2", "monto": 200 }
+  ]
+}
+```
+**Permiso requerido:** `write`
+
+- Máximo **10 000 filas** por request.
+- Operación atómica — si alguna fila falla la validación, **ninguna** se inserta.
+- Todas las filas se validan contra la `configuracion_columnas` antes de insertar.
+
+**Respuesta (201 Created):**
+```json
+{
+  "message": "10 filas insertadas correctamente",
+  "request_id": "uuid",
+  "tabla_id": "uuid-tabla",
+  "total_insertadas": 10,
+  "filas_ids": ["uuid-1", "uuid-2", "..."]
+}
+```
+
+### Bulk Delete (eliminar múltiples filas)
+```http
+DELETE /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}/datos/bulk
+Content-Type: application/json
+
+[
+  { "Id": "550e8400-e29b-41d4-a716-446655440000" },
+  { "Id": "661f9511-f30c-52e5-b827-557766551111" }
+]
+```
+**Permiso requerido:** `delete`
+
+- Máximo **3 000 ítems** por request.
+- IDs que no existan o no pertenezcan a la tabla se ignoran silenciosamente.
+
+**Respuesta (200 OK):**
+```json
+{
+  "message": "2 fila(s) eliminada(s) correctamente",
+  "request_id": "uuid",
+  "tabla_id": "uuid-tabla",
+  "total_eliminadas": 2,
+  "filas_ids": ["uuid-1", "uuid-2"]
+}
+```
+
+### Query avanzada ⭐
+```http
+POST /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}/query
+Content-Type: application/json
+```
+**Permiso requerido:** `read`
+
+Ejecuta una consulta estructurada sobre los datos de una tabla. Soporta filtros (WHERE), agrupación (GROUP BY), agregaciones (SUM/COUNT/AVG/MIN/MAX), ordenamiento (ORDER BY), paginación y Top-N por grupo. Diseñado para ser generado por un LLM a partir de la pregunta del usuario.
+
+#### Estructura del payload (`QueryPayload`)
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `filters` | `QueryFilter[]` | Condiciones WHERE (por defecto: `[]`) |
+| `group_by` | `string[]` | Columnas para agrupar (por defecto: `[]`) |
+| `aggregations` | `QueryAggregation[]` | Funciones de agregación (por defecto: `[]`) |
+| `order_by` | `QueryOrderBy[]` | Criterios de ordenamiento (por defecto: `[]`) |
+| `limit` | `int` | Máximo de filas en respuesta (1–5000, default: 100) |
+| `offset` | `int` | Filas a saltar para paginación (default: 0) |
+| `fields` | `string[]` | Campos a incluir en respuesta (null = todos) |
+| `limit_per_group` | `int` | Top N por grupo (requiere `limit_per_group_by`) |
+| `limit_per_group_by` | `string` | Columna de partición para `limit_per_group` |
+
+#### `QueryFilter`
+```json
+{ "campo": "precio", "op": "gte", "valor": 1000 }
+```
+| Operador | Descripción |
+|----------|-------------|
+| `eq` / `neq` | Igual / No igual |
+| `gt` / `gte` / `lt` / `lte` | Comparaciones numéricas |
+| `like` / `ilike` | Contiene (case-sensitive / case-insensitive) |
+| `in` | En lista: `"valor": ["a", "b"]` |
+| `is_null` / `is_not_null` | Es nulo / No es nulo |
+
+> 💡 **Variables de fecha dinámicas:** en `valor` puedes usar `"$TODAY"`, `"$WEEK_START"`, `"$MONTH_START"`, `"$YEAR_START"` para filtros relativos a la fecha actual.
+
+#### `QueryAggregation`
+```json
+{ "campo": "monto", "func": "sum", "alias": "total_ventas" }
+```
+Funciones disponibles: `sum`, `count`, `avg`, `min`, `max`. Usa `"campo": "*"` solo para `COUNT(*)`.
+
+#### `QueryOrderBy`
+```json
+{ "campo": "total_ventas", "direccion": "desc" }
+```
+
+#### Comportamiento según payload
+
+| Condición | Tipo de respuesta |
+|-----------|-------------------|
+| Sin `group_by` ni `aggregations` | `"tipo": "filas"` — devuelve filas crudas con `_id` y `_created_at` |
+| Con `group_by` y/o `aggregations` | `"tipo": "agregacion"` — devuelve resultado agrupado |
+
+#### Respuesta
+```json
+{
+  "tipo": "filas",
+  "total": 25,
+  "columnas": ["campo1", "campo2", "_id", "_created_at"],
+  "filas": [
+    { "campo1": "valor", "campo2": 100, "_id": "uuid", "_created_at": "2026-06-01T12:00:00Z" }
+  ]
+}
+```
+
+#### Ejemplos de uso
+
+**Filas filtradas y ordenadas:**
+```json
+{
+  "filters": [
+    { "campo": "activo", "op": "eq", "valor": true },
+    { "campo": "monto", "op": "gte", "valor": 1000 }
+  ],
+  "order_by": [{ "campo": "monto", "direccion": "desc" }],
+  "limit": 50
+}
+```
+
+**Ventas totales por categoría:**
+```json
+{
+  "group_by": ["categoria"],
+  "aggregations": [
+    { "campo": "monto", "func": "sum", "alias": "total_ventas" },
+    { "campo": "*",     "func": "count", "alias": "cantidad" }
+  ],
+  "order_by": [{ "campo": "total_ventas", "direccion": "desc" }]
+}
+```
+
+**Top 3 productos por categoría:**
+```json
+{
+  "group_by": ["categoria", "producto"],
+  "aggregations": [{ "campo": "monto", "func": "sum", "alias": "total" }],
+  "limit_per_group": 3,
+  "limit_per_group_by": "categoria",
+  "order_by": [{ "campo": "total", "direccion": "desc" }]
+}
+```
+
+**Solo campos específicos + filtro de fecha relativa:**
+```json
+{
+  "filters": [{ "campo": "fecha", "op": "gte", "valor": "$MONTH_START" }],
+  "fields": ["nombre", "monto", "_created_at"],
+  "order_by": [{ "campo": "_created_at", "direccion": "desc" }],
+  "limit": 100
+}
+```
 
 ---
 
