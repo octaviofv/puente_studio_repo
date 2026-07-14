@@ -38,7 +38,7 @@ puente_studio_repo/
 ├── .agents/skills/              ← Codex skill copies
 │   ├── puente-studio/
 │   └── manage-puente-workflows/
-└── APP/
+└── app/
     ├── files/                   ← Application source files
     ├── json_result/             ← Generated JSON output
     ├── output.json              ← API-ready JSON
@@ -52,19 +52,19 @@ puente_studio_repo/
 
 ```bash
 # 1. Download the artifact by ID
-node APP/pull_artefacto.js <id>
+node app/pull_artefacto.js <id>
 
-# 2. Edit files under APP/files/
+# 2. Edit files under app/files/
 #    (index.tsx, App.tsx, components/, etc.)
 
 # 3. Convert the files to JSON
-node APP/files_to_json.js
+node app/files_to_json.js
 
 # 4. Upload the changes
 curl -X PUT "$BASE_URL/studio/artefactos/<id>" \
   -H "X-API-Key: $STUDIO_KEY" \
   -H "Content-Type: application/json" \
-  -d @APP/output.json
+  -d @app/output.json
 ```
 
 The PUT replaces the complete `app_content`. Always follow GET → edit → complete PUT. Never upload only the modified files.
@@ -91,24 +91,24 @@ Immediately preserve the response `id` and `api_key`. The key is displayed only 
 Download an artifact's `app_content` and write its files locally.
 
 ```bash
-node APP/pull_artefacto.js <artefacto_id> [output_directory]
+node app/pull_artefacto.js <artefacto_id> [output_directory]
 
-node APP/pull_artefacto.js 547
-node APP/pull_artefacto.js 547 ./APP/files
-node APP/pull_artefacto.js 547 ./APP/mi-backup
+node app/pull_artefacto.js 547
+node app/pull_artefacto.js 547 ./app/files
+node app/pull_artefacto.js 547 ./app/mi-backup
 ```
 
 Use `STUDIO_KEY` and `BASE_URL` from `.env`.
 
 ### `files_to_json.js`
 
-Convert `APP/files/` into JSON compatible with the API `app_content` field.
+Convert `app/files/` into JSON compatible with the API `app_content` field.
 
 ```bash
-node APP/files_to_json.js [input_directory] [output_file]
+node app/files_to_json.js [input_directory] [output_file]
 
-node APP/files_to_json.js
-node APP/files_to_json.js ./APP/files ./APP/output.json
+node app/files_to_json.js
+node app/files_to_json.js ./app/files ./app/output.json
 ```
 
 The generated JSON has this structure:

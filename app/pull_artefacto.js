@@ -3,19 +3,19 @@
  * pull_artefacto.js
  * -----------------
  * Descarga un artefacto de Puente OS por ID y escribe sus archivos
- * en un directorio local (por defecto APP/files/), listos para editar.
+ * en un directorio local (por defecto app/files/), listos para editar.
  *
  * Es el paso inverso de files_to_json.js:
  *   pull_artefacto.js  →  descarga artefacto → archivos locales
  *   files_to_json.js   →  archivos locales   → JSON de la API
  *
  * Uso:
- *   node APP/pull_artefacto.js <artefacto_id> [directorio_salida]
+ *   node app/pull_artefacto.js <artefacto_id> [directorio_salida]
  *
  * Ejemplos:
- *   node APP/pull_artefacto.js 547
- *   node APP/pull_artefacto.js 547 ./APP/files
- *   node APP/pull_artefacto.js 547 ./APP/mi-backup
+ *   node app/pull_artefacto.js 547
+ *   node app/pull_artefacto.js 547 ./app/files
+ *   node app/pull_artefacto.js 547 ./app/mi-backup
  *
  * Requisitos:
  *   - Node.js 14+ (sin dependencias externas)
@@ -142,7 +142,7 @@ async function main() {
     const artefactoId = process.argv[2];
     if (!artefactoId || isNaN(Number(artefactoId))) {
         console.error('\n❌  Debes proporcionar un ID de artefacto numérico.');
-        console.error('    Uso: node APP/pull_artefacto.js <artefacto_id> [directorio_salida]\n');
+        console.error('    Uso: node app/pull_artefacto.js <artefacto_id> [directorio_salida]\n');
         process.exit(1);
     }
 
@@ -255,7 +255,7 @@ async function main() {
     console.log(`\n💾  ${escritos} archivo(s) escritos en: ${path.relative(rootDir, outputDir)}/`);
     console.log(`\n📝  Próximos pasos:`);
     console.log(`    1. Edita los archivos en ${path.relative(rootDir, outputDir)}/`);
-    console.log(`    2. Convierte a JSON:   node APP/files_to_json.js ./APP/files ./APP/output.json`);
+    console.log(`    2. Convierte a JSON:   node app/files_to_json.js ./app/files ./app/output.json`);
     console.log(`    3. Sube los cambios:   curl -X PUT $BASE_URL/studio/artefactos/${artefactoId} -H "X-API-Key: $STUDIO_KEY" ...`);
     console.log('');
 }

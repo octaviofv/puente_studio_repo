@@ -20,12 +20,12 @@
  * }
  *
  * Uso:
- *   node APP/files_to_json.js [directorio_entrada] [archivo_salida]
+ *   node app/files_to_json.js [directorio_entrada] [archivo_salida]
  *
  * Ejemplos:
- *   node APP/files_to_json.js
- *   node APP/files_to_json.js ./APP/files
- *   node APP/files_to_json.js ./APP/files ./APP/output.json
+ *   node app/files_to_json.js
+ *   node app/files_to_json.js ./app/files
+ *   node app/files_to_json.js ./app/files ./app/output.json
  *
  * Requisitos:
  *   - Node.js 14+ (sin dependencias externas)
@@ -40,7 +40,7 @@ const path = require('path');
 
 const args = process.argv.slice(2);
 
-// El script puede ejecutarse desde cualquier directorio; __dirname es siempre APP/
+// El script puede ejecutarse desde cualquier directorio; __dirname es siempre app/
 const DEFAULT_INPUT = path.join(__dirname, 'files');
 const DEFAULT_OUTPUT = path.join(__dirname, 'output.json');
 
@@ -88,7 +88,7 @@ function main() {
     // Validar directorio de entrada
     if (!fs.existsSync(inputDir)) {
         console.error(`\n❌  El directorio de entrada no existe: ${inputDir}`);
-        console.error(`    Crea tus archivos en APP/files/ o pasa la ruta como argumento.\n`);
+        console.error(`    Crea tus archivos en app/files/ o pasa la ruta como argumento.\n`);
         process.exit(1);
     }
 
@@ -118,7 +118,7 @@ function main() {
     console.log(`\n📝  Próximos pasos:`);
     console.log(`    - Crear artefacto:     curl -X POST $PUENTE_BASE_URL/insert_artefacto ...`);
     console.log(`    - Actualizar artefacto: curl -X PUT $PUENTE_BASE_URL/update_artefacto/{id} ...`);
-    console.log(`    - Ver guía completa:   APP/ARTEFACTOS_GUIDE.md\n`);
+    console.log(`    - Ver guía completa:   app/ARTEFACTOS_GUIDE.md\n`);
 }
 
 main();

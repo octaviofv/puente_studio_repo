@@ -995,10 +995,10 @@ if (res.status === 429) {
 
 ```bash
 # Convertir archivos locales a JSON listo para subir
-node APP/files_to_json.js               # lee APP/files/ → APP/output.json
+node app/files_to_json.js               # lee app/files/ → app/output.json
 
 # Bajar artefacto existente
-node APP/pull_artefacto.js {id}         # descarga a APP/files/
+node app/pull_artefacto.js {id}         # descarga a app/files/
 ```
 
 ---
