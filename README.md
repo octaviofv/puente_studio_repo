@@ -1,7 +1,7 @@
 # Puente Studio — Dev Kit
 
 Kit de desarrollo local para crear y gestionar aplicaciones web dentro de **Puente OS**.  
-Incluye scripts Node.js para bajar y subir artefactos, y la documentación completa del agente en [`skill_puente_studio.md`](./skill_puente_studio.md).
+Incluye scripts Node.js para bajar y subir artefactos, la skill principal en [`skills/puente-studio/`](./skills/puente-studio/), y una skill enfocada en definiciones de workflows en [`skills/manage-puente-workflows/`](./skills/manage-puente-workflows/).
 
 ---
 
@@ -9,7 +9,7 @@ Incluye scripts Node.js para bajar y subir artefactos, y la documentación compl
 
 - Node.js 14+ (sin dependencias externas)
 - Cuenta activa en [app.puente.xyz](https://app.puente.xyz)
-- Una **Platform API Key** (`puente_studio_xxx`) generada desde Configuración
+- Una **Platform API Key** generada desde Configuración
 
 ---
 
@@ -27,8 +27,8 @@ cp .env.example .env
 Edita `.env` y completa tu `STUDIO_KEY`:
 
 ```env
-BASE_URL=https://puente-backend-721178029791.southamerica-west1.run.app/
-STUDIO_KEY=puente_studio_xxxxxxxxxxxxxxxxxxxx
+BASE_URL=<base_url>
+STUDIO_KEY=<puente_studio_placeholder>
 ```
 
 ---
@@ -40,7 +40,11 @@ puente_studio_repo/
 ├── .env.example              ← Plantilla de variables de entorno
 ├── .env                      ← Tu configuración local (no commitear)
 ├── README.md                 ← Este archivo
-├── skill_puente_studio.md    ← Documentación completa del agente
+├── AGENTS.md                ← Instrucciones compartidas para agentes
+├── CLAUDE.md                ← Carga las instrucciones de AGENTS.md
+├── skills/
+│   ├── puente-studio/          ← Skill principal de Puente Studio
+│   └── manage-puente-workflows/ ← Gestión de definiciones de workflows
 └── APP/
     ├── files/                ← Archivos fuente de la app (editar aquí)
     ├── json_result/          ← JSONs de salida (generados)
@@ -137,7 +141,7 @@ El JSON generado tiene la forma:
 
 | Contexto | Header | Credencial |
 |---|---|---|
-| Gestión (scripts, agente) | `X-API-Key` | `STUDIO_KEY` (`puente_studio_xxx`) |
+| Gestión (scripts, agente) | `X-API-Key` | `STUDIO_KEY` (`<puente_studio_placeholder>`) |
 | Frontend de la app publicada | `X-API-Key` | API Key del artefacto (`puente_art_xxx`) |
 
 > 🔐 Nunca uses la `STUDIO_KEY` dentro del código de una app publicada.
@@ -173,4 +177,4 @@ El JSON generado tiene la forma:
 | Conceder acceso a tabla | POST | `/studio/artefactos/{id}/tablas-acceso` |
 | Revocar acceso | DELETE | `/studio/artefactos/{id}/tablas-acceso/{tabla_id}` |
 
-Documentación completa → [`skill_puente_studio.md`](./skill_puente_studio.md)
+Documentación completa → [`skills/puente-studio/SKILL.md`](./skills/puente-studio/SKILL.md)
