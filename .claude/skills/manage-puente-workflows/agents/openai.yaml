@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage Puente Workflows"
+  short_description: "Manage workflow definitions from Puente Studio"
+  default_prompt: "Use $manage-puente-workflows to safely inspect or manage Puente workflow definitions while disclosing backend lifecycle effects and requiring explicit activation confirmation."

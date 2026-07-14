@@ -2,7 +2,7 @@
 
 ## Repository purpose
 
-This repository contains the Puente Studio development kit and its canonical Agent Skills.
+This repository contains the Puente Studio development kit and native Agent Skills for Claude Code and Codex.
 
 ## Skill routing
 
@@ -11,12 +11,13 @@ This repository contains the Puente Studio development kit and its canonical Age
 - Read the selected skill completely before acting.
 - When a task involves both areas, load both skills.
 
-## Canonical skill source
+## Mirrored skill copies
 
-- Canonical skills live under `skills/`.
-- `.agents/skills/` and `.claude/skills/` contain discovery symlinks only.
-- Edit skills only through their canonical directories under `skills/`.
-- Never create separate Claude and Codex versions of the same skill.
+- Claude Code skills live under `.claude/skills/` and are the production copies.
+- Codex skills live under `.agents/skills/`.
+- Both directories contain real files. Do not use symlinks and do not create a root `skills/` directory.
+- Keep matching Claude Code and Codex skill directories byte-identical.
+- Whenever a skill changes, apply the same change to both copies and verify that they remain identical.
 
 ## Credentials and safety
 
@@ -31,9 +32,12 @@ puente_studio_repo/
 ├── README.md                    ← Human-facing setup
 ├── AGENTS.md                    ← Shared agent instructions
 ├── CLAUDE.md                    ← Loads AGENTS.md
-├── skills/
-│   ├── puente-studio/             ← Primary Puente Studio skill
-│   └── manage-puente-workflows/  ← Workflow-definition management
+├── .claude/skills/              ← Claude Code production skill copies
+│   ├── puente-studio/
+│   └── manage-puente-workflows/
+├── .agents/skills/              ← Codex skill copies
+│   ├── puente-studio/
+│   └── manage-puente-workflows/
 └── APP/
     ├── files/                   ← Application source files
     ├── json_result/             ← Generated JSON output
