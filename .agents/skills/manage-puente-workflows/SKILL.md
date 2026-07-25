@@ -36,7 +36,7 @@ Read [references/api.md](references/api.md) before preparing a request. Read [re
 ## Before changing a definition
 
 1. Inspect the current saved definition through `GET /workflows/?all_versions=true`.
-2. Validate every `node_id` through `GET /workflows/integrations`; never invent node types.
+2. Validate every `node_id` through `GET /workflows/integrations`; never invent node types. When the request involves node-level code, inspect `GET /openapi.json` too: `script_code` is a persisted `WorkflowNode` field, not an integration `inputs` field.
 3. Preserve the complete `nodes` and `edges` arrays when creating a new version.
 4. Default new definitions and versions to `draft` unless the user explicitly requests another saved status.
 5. Explain that `POST /workflows/` automatically generates or inherits synchronous-webhook metadata, inherits scheduling metadata on new versions, and attempts Hookdeck webhook provisioning.
@@ -70,6 +70,51 @@ Definition management can still change runtime eligibility:
 - Saving `status: "active"` does not execute immediately, but it enables existing external triggers, synchronous webhooks, or schedules to execute that workflow.
 
 Require explicit user confirmation for every transition or create/version payload that saves an active status. Never describe activation as inert metadata.
+
+## Protected table values in workflows
+
+The `Puente -> Query / Leer Datos` node may expose the real values of columns
+created with `encrypt_at_rest: true`, but only when its **live catalog** exposes
+the optional boolean input `decrypt_encrypted_fields` and the workflow author
+explicitly sets it to `true`.
+
+- The default is `false`: a table query receives the opaque `kms:v1:...`
+  ciphertext, exactly like the Studio table API.
+- With `true`, the backend reads the permitted table rows, then decrypts only
+  protected columns included by the query's `fields` projection. The stored
+  table row remains encrypted.
+- The real values become normal workflow output: later nodes may use them and
+  authorized workflow-history readers may see them. This is intentional, so
+  explain it and obtain explicit confirmation before saving a definition that
+  enables it.
+- Do not claim this protects a value from a later HTTP, agent, webhook, or
+  integration node. Such a node can intentionally disclose normal workflow
+  output.
+- Keep the projection and `limit` narrow. More than 1,000 protected non-null
+  cells, KMS unavailability, or one invalid ciphertext fails the entire query
+  node with `Failed to decrypt`; no partial result is available.
+- Protected columns remain unavailable for filters, sorting, grouping,
+  aggregation, and Top-N even when decryption is enabled. The system creates a
+  metadata-only audit event and does not put the plaintext in application logs.
+
+Never use this as an excuse to invent a Studio table-reveal endpoint or to
+place plaintext inside published application code. The Studio table API,
+public table APIs, and ordinary table reads remain ciphertext-only.
+
+## Python code nodes
+
+The live integration catalog controls a node's `inputs` object. It does not
+describe every persisted `WorkflowNode` field. In the public OpenAPI contract,
+`script_code` is a top-level field on `WorkflowNode`, so an empty
+`input_schema` for `core.python_code` does **not** mean that the Python node
+cannot receive a script.
+
+For a requested Python step, validate `core.python_code` through the live
+catalog, validate `script_code` through `GET /openapi.json`, and save the code
+as the node's top-level `script_code` field—not inside `inputs`. Do not invent
+runtime variables, output paths, or interpolation syntax: derive those from a
+documented public contract, an existing saved workflow, or user-provided
+details.
 
 ## Report results
 
