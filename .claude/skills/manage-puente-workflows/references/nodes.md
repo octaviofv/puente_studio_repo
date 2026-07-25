@@ -6,6 +6,7 @@
 - Discover node types
 - Catalog response
 - Saved node shape
+- Python script nodes
 - Inputs and references
 - Edges
 - Safe authoring
@@ -21,12 +22,16 @@ X-API-Key: <STUDIO_KEY>
 
 Read `BASE_URL` and `STUDIO_KEY` from the repository `.env`. Send the Studio Key as `X-API-Key`. No backend repository, database access, user login, or bearer token is required.
 
-The integrations response is the only source of truth for:
+The integrations response is the source of truth for:
 
 - currently available `node_id` values;
 - the node `type` and display `category`;
 - supported inputs, defaults, options, and required fields;
 - node catalog versions and display metadata.
+
+The public `GET /openapi.json` contract is the source of truth for the
+persisted `WorkflowNode` shape. Use it when a requested workflow needs a
+top-level node field that is not an integration input, such as `script_code`.
 
 Never depend on internal backend code, migrations, database rows, private templates, or hard-coded node lists. Never invent a `node_id` or an input field.
 
@@ -93,6 +98,7 @@ Create a new saved node from public catalog data with:
   "inputs": {
     "<schema-field-name>": "<user-supplied-value>"
   },
+  "script_code": null,
   "on_error": "stop",
   "position": {"x": 400, "y": 0},
   "index_position": 1
@@ -104,11 +110,23 @@ Create a new saved node from public catalog data with:
 | `label` | Stable name used to identify this node inside the workflow. |
 | `node_id` | Exact identifier returned by `integrations`. |
 | `inputs` | Object constructed only from the selected node's current `input_schema`. |
+| `script_code` | Optional top-level persisted node field documented by `GET /openapi.json`; it is not an `inputs` key. Use it for a requested `core.python_code` script only after validating the public contract. |
 | `on_error` | Use `stop` by default. Use `continue` only when the user explicitly wants later nodes to proceed after failure. |
 | `position` | Optional visual-editor coordinates. |
 | `index_position` | Optional canvas index used with the label to identify the node in references and edges. |
 
-Do not author custom scripts or implementation code through this skill. For an existing workflow version, preserve the complete saved node objects returned by the API and change only the fields required by the user's requested definition update.
+For an existing workflow version, preserve the complete saved node objects returned by the API and change only the fields required by the user's requested definition update. Do not guess Python runtime variables, output paths, or interpolation syntax merely because `script_code` is supported.
+
+## Python script nodes
+
+When the user requests a Python step, first confirm that the live catalog
+contains `core.python_code`. The catalog's `input_schema` controls only
+`inputs`; it can be empty while the node still accepts its top-level
+`script_code` field. Confirm that field in `GET /openapi.json` before saving.
+
+Place the source string in `script_code`, not in `inputs`. The OpenAPI schema
+does not by itself define which workflow variables are available inside the
+Python runtime, so use only a documented or already-saved reference pattern.
 
 ## Inputs and references
 
@@ -139,6 +157,32 @@ The public integrations catalog does not provide a formal output schema. Do not 
 
 Keep labels and indexes unique and stable. If either changes, update every corresponding reference and edge.
 
+## Querying protected table fields
+
+For the catalog node displayed as **Puente -> Query / Leer Datos**, inspect the
+live `input_schema`. When it contains `decrypt_encrypted_fields`, it is an
+optional boolean that defaults to `false`.
+
+Use `decrypt_encrypted_fields: true` only after the workflow author confirms
+that the workflow needs the real value of a column created with
+`encrypt_at_rest: true`. The backend decrypts protected fields only after the
+allowed table query has returned rows, and only for fields included in the
+node's `fields` projection. The ciphertext remains stored in the table.
+
+The result is normal workflow context, so later nodes can reference it through
+the usual context-key syntax and authorized readers can see it in workflow
+execution history. Do not describe that as masked data: a subsequent HTTP,
+agent, webhook, or integration node may deliberately disclose it.
+
+Keep `fields` and `limit` as small as the workflow needs. A query cannot use a
+protected field for filters, sorting, grouping, aggregation, or Top-N. The
+node rejects more than 1,000 protected non-null cells and fails the whole node
+with `Failed to decrypt` when any selected protected value cannot be
+decrypted. Do not rely on partial rows.
+
+This input does not change the Studio table API or a published application's
+table API: those ordinary reads continue to return `kms:v1:...` ciphertext.
+
 ## Edges
 
 Edges use workflow context keys, not catalog `node_id` values:
@@ -158,7 +202,8 @@ Do not use edges to invent branching, looping, or execution behavior that is not
 
 1. Request `GET /workflows/integrations` and use its returned catalog.
 2. Select only a returned `node_id`.
-3. Build `inputs` only from that entry's `input_schema`.
+3. Build `inputs` only from that entry's `input_schema`. For a Python script,
+   separately validate the top-level `script_code` field in `GET /openapi.json`.
 4. Ask for every missing required operational value.
 5. Default `on_error` to `stop`.
 6. Keep new or changed workflows in `draft` unless activation is explicitly requested and confirmed.

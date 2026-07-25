@@ -373,6 +373,82 @@ Content-Type: application/json
 { "nombre": "nuevo_nombre", "descripcion": "nueva descripción" }
 ```
 
+### Encryption at rest for columns (v0)
+
+`encrypt_at_rest` is a **creation-only** decision. Studio may set it only in
+`POST /studio/tablas` for a completely new table, and only for scalar `text`,
+`number`, `date`, `boolean`, or `select` columns. Always include the explicit
+boolean on **every** column:
+
+```json
+{
+  "nombre": "Customers",
+  "descripcion": "Operational data",
+  "equipo_id": null,
+  "columnas": [
+    { "key": "email", "label": "Email", "tipo": "text", "requerido": true, "opciones": null, "encrypt_at_rest": true },
+    { "key": "nombre", "label": "Name", "tipo": "text", "requerido": true, "opciones": null, "encrypt_at_rest": false },
+    { "key": "estado", "label": "Status", "tipo": "select", "requerido": false, "opciones": ["active", "inactive"], "encrypt_at_rest": false }
+  ]
+}
+```
+
+- There is no toggle, backfill, or migration from `false → true` or `true → false` after table creation. Do not invent a Studio reveal or bulk-update endpoint.
+- For an already encrypted column, `key`, `tipo`, and `encrypt_at_rest` are immutable; its label, required flag, and options may be edited, and the column may be deleted.
+- `null` remains `null`. Images, files, PDFs, Base64, GCS references, objects, and arrays cannot be encrypted. The serialized value is limited to **60 KiB**; a bulk request permits up to **1,000 non-null encrypted cells**.
+
+#### Reading and writing encrypted values
+
+Studio sends **plaintext** when inserting or changing an encrypted column. The backend encrypts those values. Ordinary Studio, API-key, and public-app reads and write responses return an opaque `kms:v1:...` envelope: treat it as uninterpretable data, do not display it as the value, decrypt it, or attempt reveal. Studio, API keys, and public apps **do not have** a decrypt/reveal endpoint or permission.
+
+#### Using a protected value inside a workflow
+
+A workflow in the same team may explicitly opt to use the real value. In the
+**Puente → Query / Leer Datos** node, include the catalog field
+`decrypt_encrypted_fields: true`. Leave it `false` when the workflow does not
+need the real value: it is the default, and the node receives the `kms:v1:...`
+envelope.
+
+```json
+{
+  "tabla_id": "uuid-de-la-tabla",
+  "fields": ["email", "nombre"],
+  "limit": 1,
+  "decrypt_encrypted_fields": true
+}
+```
+
+The backend queries the encrypted table first, then decrypts only the protected
+columns requested in `fields`. The real value becomes ordinary workflow output:
+later nodes may use it and people authorized to inspect the execution may see
+it in its history. It is not delivered to Studio, the public API, or the table
+API; the stored row remains encrypted.
+
+- Before enabling this option, confirm that the workflow author understands a later node, HTTP integration, agent, or webhook response could share that value.
+- Use a minimal projection and a small `limit`. The node rejects more than **1,000** non-null protected cells and fails entirely with `Failed to decrypt` if any cannot be decrypted; it returns no partial result.
+- Even with this option enabled, protected columns cannot be filtered, sorted, grouped, aggregated, or used in Top-N. Decryption occurs after a permitted query.
+- The system records read metadata for auditing without storing the value in application logs.
+
+`PUT /studio/tablas/{tabla_id}/datos/{fila_id}` replaces the complete row. For an unchanged encrypted column, send back exactly the `kms:v1:...` envelope received in the current read. If the value changes, send plaintext only for that field; the backend returns the new encrypted envelope. Do not re-encrypt or alter an envelope. A `kms:v1:...` envelope that differs from the current one is a `409` conflict.
+
+```json
+{
+  "datos": {
+    "email": "kms:v1:copy-the-current-envelope-exactly",
+    "nombre": "Updated Ava",
+    "estado": "active"
+  }
+}
+```
+
+Encrypted columns cannot participate in filters, sorting, `group_by`, aggregations, or Top-N. Field projection and `COUNT(*)` remain permitted. Published apps must exclude these columns from filter, sort, and AI selectors and always treat the envelope as opaque.
+
+| Code | Handling guidance |
+|--------|----------------|
+| `409` | A stale or different encrypted envelope was sent. Read the row again and retry with the current envelope. |
+| `422` | The schema, type, size (>60 KiB), or value is invalid. Correct the payload; do not fall back to unencrypted text. |
+| `503` | KMS is unavailable for an encrypted operation. Do not write alternate plaintext; retry later. |
+
 ### Leer filas
 ```http
 GET {BASE_URL}/studio/tablas/{tabla_id}/datos?limit=500&offset=0
