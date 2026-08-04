@@ -38,8 +38,12 @@ X-API-Key: {STUDIO_KEY}
 | Obtener metadatos + public_id (versión específica) | GET | `{BASE_URL}/studio/artefactos/{id}/meta` |
 | Crear app | POST | `{BASE_URL}/studio/artefactos` |
 | Actualizar app (push) | PUT | `{BASE_URL}/studio/artefactos/group/{group_id}` |
+| Actualizar `slug` / `sharing_mode` de app (sin push, versión específica) | PUT | `{BASE_URL}/studio/artefactos/{id}/meta` |
 | Listar tablas | GET | `{BASE_URL}/studio/tablas` |
 | Crear tabla | POST | `{BASE_URL}/studio/tablas` |
+| Obtener la estructura de una tabla | GET | `{BASE_URL}/studio/tablas/{tabla_id}/estructura` |
+| Actualizar nombre/descripción de tabla | PUT | `{BASE_URL}/studio/tablas/{tabla_id}` |
+| **⚠️ Migrar la estructura de columnas (destructivo)** | PUT | `{BASE_URL}/studio/tablas/{tabla_id}/estructura` |
 | Leer filas | GET | `{BASE_URL}/studio/tablas/{tabla_id}/datos` |
 | Insertar fila | POST | `{BASE_URL}/studio/tablas/{tabla_id}/datos` |
 | Actualizar fila | PUT | `{BASE_URL}/studio/tablas/{tabla_id}/datos/{fila_id}` |
@@ -79,11 +83,14 @@ Nunca uses la `STUDIO_KEY` dentro del código de una app publicada — es una cr
 - **Obtener** el código completo de una app
 - **Crear** una nueva app con sus archivos de código
 - **Actualizar** el título, descripción o archivos de una app existente
+- **Fijar** el `slug` o cambiar la visibilidad (`sharing_mode`) de una app sin tocar su código
 
 ### Tablas de datos
 - **Listar** las tablas del equipo
 - **Crear** una nueva tabla definiendo sus columnas
 - **Actualizar** el nombre o descripción de una tabla
+- **Obtener** la estructura de columnas de una tabla
+- **Migrar** el esquema de columnas de una tabla — operación destructiva, requiere confirmación
 - **Leer** las filas de una tabla (paginado)
 - **Insertar** una fila
 - **Actualizar** una fila existente por su `fila_id`
@@ -247,6 +254,35 @@ Retorna `id`, `titulo`, `descripcion`, `slug`, **`public_id`**, `equipo_id`, `em
 
 > 🔗 **Link público:** `https://app.puente.xyz/public/{public_id}/`
 
+### Actualizar metadatos de una app por `id` (sin push, versión específica) ⭐
+```http
+PUT {BASE_URL}/studio/artefactos/{id}/meta
+Content-Type: application/json
+
+{
+  "titulo": "Nuevo nombre",
+  "descripcion": "Nueva descripción",
+  "slug": "mi-app",
+  "sharing_mode": "public"
+}
+```
+Actualiza `titulo`, `descripcion`, `slug` y/o `sharing_mode` **sin modificar el `app_content`**. Todos los campos son opcionales y nullable: envía solo los que quieres cambiar.
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `titulo` | string \| null | Nombre visible de la app |
+| `descripcion` | string \| null | Descripción de la app |
+| `slug` | string \| null | Identificador legible de la app — **único a nivel de plataforma** |
+| `sharing_mode` | `"public"` \| `"private"` \| null | Visibilidad de la app |
+
+Actualiza los metadatos sin tocar el `app_content`. La forma de la respuesta no está tipada en el spec — no asumas un cuerpo concreto; vuelve a leer con `GET /studio/artefactos/group/{group_id}/meta` si necesitas confirmar el resultado.
+
+> ⭐ **Para cambiar solo `titulo` o `descripcion`, prefiere `PUT /studio/artefactos/group/{group_id}`** enviándolos sin `app_content`: hace un UPDATE directo sin versionar y usa el identificador estable. Este endpoint es necesario únicamente para `slug` y `sharing_mode`, que el push por `group_id` no acepta.
+
+> ⚠️ **Resuelve primero el `id` vigente** con `GET /studio/artefactos/group/{group_id}/meta`. Este endpoint apunta a una fila de versión concreta; un `id` guardado de una sesión anterior puede ya no ser `is_latest`. El spec no documenta si el cambio aplica al grupo completo o solo a esa versión, así que verifica el resultado con un `GET .../group/{group_id}/meta` después de escribir.
+
+> ⚠️ El `slug` es único en toda la plataforma, no solo dentro de tu equipo: puede colisionar con el de otro artefacto. Si el request es rechazado por el slug, propón otro valor al usuario.
+
 ### Obtener una app por `id` (contenido completo, versión específica)
 ```http
 GET {BASE_URL}/studio/artefactos/{id}
@@ -346,15 +382,17 @@ Content-Type: application/json
   "descripcion": "Descripción opcional",
   "equipo_id": null,
   "columnas": [
-    { "key": "nombre_campo", "label": "Nombre visible", "tipo": "text",    "requerido": true  },
-    { "key": "cantidad",     "label": "Cantidad",        "tipo": "number",  "requerido": false },
-    { "key": "fecha",        "label": "Fecha",           "tipo": "date",    "requerido": false },
-    { "key": "activo",       "label": "Activo",          "tipo": "boolean", "requerido": false },
-    { "key": "estado",       "label": "Estado",          "tipo": "select",  "requerido": false,
+    { "key": "nombre_campo", "label": "Nombre visible", "tipo": "text",    "requerido": true,  "encrypt_at_rest": false },
+    { "key": "cantidad",     "label": "Cantidad",        "tipo": "number",  "requerido": false, "encrypt_at_rest": false },
+    { "key": "fecha",        "label": "Fecha",           "tipo": "date",    "requerido": false, "encrypt_at_rest": false },
+    { "key": "activo",       "label": "Activo",          "tipo": "boolean", "requerido": false, "encrypt_at_rest": false },
+    { "key": "estado",       "label": "Estado",          "tipo": "select",  "requerido": false, "encrypt_at_rest": false,
       "opciones": ["Opción A", "Opción B"] }
   ]
 }
 ```
+
+> 🔐 Incluye siempre `encrypt_at_rest` explícito en **cada** columna. Este es el único momento en que puedes ponerlo en `true`: ver **Encryption at rest for columns (v0)** más abajo.
 
 **Tipos de columna disponibles:**
 | Tipo | Descripción | Formato |
@@ -365,6 +403,16 @@ Content-Type: application/json
 | `boolean` | Verdadero/Falso | `true` / `false` (no strings) |
 | `select` | Lista de opciones | Requiere campo `opciones: []` |
 
+### Obtener la estructura de una tabla ⭐
+```http
+GET {BASE_URL}/studio/tablas/{tabla_id}/estructura
+```
+Retorna únicamente la `configuracion_columnas` de la tabla: la lista de objetos columna con `key`, `label`, `tipo`, `opciones` y `requerido`. Sirve para construir formularios y validaciones dinámicas sin cargar los datos de la tabla.
+
+> 💡 **No existe `GET /studio/tablas/{tabla_id}` en la API.** Este es el único endpoint del plano `/studio` para leer la definición de una tabla concreta — desde una app publicada se usa `GET /public/artefacto/{artefacto_group_id}/tablas/{tabla_id}`. Úsalo antes de insertar o actualizar filas para validar el payload contra las columnas reales.
+
+> ⚠️ **No asumas que la respuesta incluye `encrypt_at_rest`.** El spec solo documenta `key`, `label`, `tipo`, `opciones` y `requerido`. Si necesitas saber qué columnas están cifradas, confírmalo con el usuario o mira una lectura de datos (las columnas cifradas devuelven un sobre `kms:v1:...`); no lo deduzcas del silencio de este endpoint.
+
 ### Actualizar tabla
 ```http
 PUT {BASE_URL}/studio/tablas/{tabla_id}
@@ -372,6 +420,70 @@ Content-Type: application/json
 
 { "nombre": "nuevo_nombre", "descripcion": "nueva descripción" }
 ```
+Cambia solo los metadatos de la tabla.
+
+> Para **agregar, quitar o modificar columnas** no uses este endpoint — ver *Migrar la estructura de columnas de una tabla* a continuación.
+
+### Migrar la estructura de columnas de una tabla
+
+> ⚠️ **OPERACIÓN DESTRUCTIVA — confirma con el usuario antes de ejecutar.**
+> Este endpoint ejecuta una **migración de esquema**: actualiza la lista de columnas y aplica los cambios estructurales sobre los datos ya existentes — elimina las claves de las columnas borradas y castea los valores de las columnas cuyo `tipo` cambió. Los datos de una columna eliminada no se recuperan. Explica el impacto al usuario y espera su confirmación antes de ejecutar.
+
+> Diferencia con `PUT /studio/tablas/{tabla_id}`: ese endpoint solo cambia **metadatos** (`nombre`, `descripcion`) y no toca las columnas ni los datos. Este endpoint **migra el esquema** y reescribe los datos existentes.
+
+```http
+PUT {BASE_URL}/studio/tablas/{tabla_id}/estructura
+Content-Type: application/json
+
+{
+  "nombre": "nombre_tabla",
+  "descripcion": "Descripción opcional",
+  "equipo_id": null,
+  "columnas": [
+    { "key": "nombre_campo", "label": "Nombre visible", "tipo": "text",   "requerido": true,  "opciones": null, "encrypt_at_rest": false },
+    { "key": "estado",       "label": "Estado",         "tipo": "select", "requerido": false, "opciones": ["Opción A", "Opción B"], "encrypt_at_rest": false }
+  ]
+}
+```
+
+**Campos del body (`TablaEstructuraActualizar`):**
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|-------------|-------------|
+| `nombre` | `string` (mín. 1 carácter) | **Sí** | Nombre de la tabla |
+| `descripcion` | `string \| null` | No | Descripción de la tabla |
+| `equipo_id` | `int \| null` | No | Equipo dueño de la tabla |
+| `columnas` | `array` | **Sí** | Lista completa de columnas del nuevo esquema |
+
+**Cada objeto de `columnas`:**
+| Campo | Tipo | Obligatorio | Descripción |
+|-------|------|-------------|-------------|
+| `key` | `string` | **Sí** | Identificador interno — debe cumplir `^[A-Za-z_][A-Za-z0-9_]*$` |
+| `label` | `string` | **Sí** | Nombre visible para el usuario |
+| `tipo` | `string` | **Sí** | `text`, `number`, `date`, `boolean` o `select` |
+| `requerido` | `boolean` | No (default `false`) | Si el campo es obligatorio |
+| `opciones` | `string[] \| null` | No | Valores permitidos — obligatorio para `select` |
+| `encrypt_at_rest` | `boolean \| null` | Opcional en el schema, **obligatorio en la práctica** | Repite el valor actual de la columna; `false` en toda columna nueva. A diferencia de `POST /studio/tablas`, aquí el campo **no tiene default**: omitirlo sobre una columna cifrada tiene efecto indefinido |
+
+> ⚠️ **`columnas` reemplaza el esquema completo.** Toda columna que no aparezca en el array se elimina junto con sus datos. Flujo seguro: `GET /studio/tablas/{tabla_id}/estructura` → modifica la lista en memoria → PUT con la lista entera.
+
+**Respuesta (200 OK):**
+```json
+{
+  "id": "f733d7a9-7e1d-457c-ae70-191ff5723cbe",
+  "nombre": "nombre_tabla",
+  "descripcion": "Descripción opcional",
+  "empresa_id": 8,
+  "equipo_id": 8,
+  "configuracion_columnas": [
+    { "key": "nombre_campo", "label": "Nombre visible", "tipo": "text", "requerido": true, "opciones": null, "encrypt_at_rest": false }
+  ],
+  "created_at": "2026-04-30T20:23:23.497222+00:00"
+}
+```
+
+> 🔐 **Cifrado:** este endpoint es la vía para editar el `label`, el `requerido` y las `opciones` de una columna cifrada, y para eliminarla. **No sirve para agregar cifrado por ninguna ruta:** ni cambiando `encrypt_at_rest` en una columna existente, ni agregando una columna nueva con `encrypt_at_rest: true`. Toda columna nueva que agregues aquí debe llevar `encrypt_at_rest: false`; para obtener una columna cifrada hay que crear una tabla nueva con `POST /studio/tablas`. Las reglas completas están en **Encryption at rest for columns (v0)** a continuación.
+
+> ⚠️ **Si la tabla tiene columnas cifradas, no ejecutes esta migración sin confirmar antes con el usuario el valor de `encrypt_at_rest` de cada columna.** El `GET /estructura` no está documentado como que devuelva ese campo, así que el flujo GET → modificar → PUT no basta para reconstruirlo, y un valor equivocado sobre una columna cifrada es irreversible.
 
 ### Encryption at rest for columns (v0)
 
@@ -394,7 +506,7 @@ boolean on **every** column:
 ```
 
 - There is no toggle, backfill, or migration from `false → true` or `true → false` after table creation. Do not invent a Studio reveal or bulk-update endpoint.
-- For an already encrypted column, `key`, `tipo`, and `encrypt_at_rest` are immutable; its label, required flag, and options may be edited, and the column may be deleted.
+- For an already encrypted column, `key`, `tipo`, and `encrypt_at_rest` are immutable; its label, required flag, and options may be edited, and the column may be deleted. Those edits and that deletion go through `PUT /studio/tablas/{tabla_id}/estructura`, which never toggles `encrypt_at_rest` and never accepts a new column with `encrypt_at_rest: true`.
 - `null` remains `null`. Images, files, PDFs, Base64, GCS references, objects, and arrays cannot be encrypted. The serialized value is limited to **60 KiB**; a bulk request permits up to **1,000 non-null encrypted cells**.
 
 #### Reading and writing encrypted values
@@ -584,18 +696,8 @@ Por seguridad, **nunca retorna la key en texto plano**.
 ```
 
 ### Actualizar rate limit
-```http
-PUT {BASE_URL}/studio/artefactos/{id}/api-key
-Content-Type: application/json
 
-{
-  "rate_limit_config": {
-    "requests_per_minute": 120,
-    "requests_per_hour": 5000,
-    "requests_per_day": 50000
-  }
-}
-```
+> ⛔ **No disponible con `STUDIO_KEY`.** El plano `/studio` solo expone `GET .../api-key` y `POST .../api-key/regenerate`. La edición del `rate_limit_config` (y la revocación de una key sin regenerarla) vive en `PUT /artefactos/{id}/api-key`, que exige JWT y por lo tanto solo es alcanzable desde la app de Puente. Si el usuario pide cambiar los límites, indícale que lo haga en app.puente.xyz; no intentes el request.
 
 ### Regenerar API Key
 
@@ -999,19 +1101,21 @@ curl -X POST {BASE_URL}/studio/artefactos \
 ### Editar una app existente (flujo seguro)
 
 ```
-1. GET  /studio/artefactos/{id}   → descarga el app_content completo
+1. GET  /studio/artefactos/group/{group_id}   → descarga el app_content vigente
 2. Modifica solo los archivos necesarios en memoria
-3. PUT  /studio/artefactos/{id}   → sube el app_content COMPLETO (con modificaciones)
+3. PUT  /studio/artefactos/group/{group_id}   → sube el app_content COMPLETO (con modificaciones)
 ```
 
 > ⚠️ Nunca hagas PUT con `app_content` parcial — borrarás los archivos no incluidos.
 
+> ⚠️ Siempre por `group_id`, nunca por el `id` numérico: el `id` apunta a una versión concreta y cambia con cada push.
+
 ```
-[Puente OS] --GET /studio/artefactos/{id}--> [app_content en memoria]
-                                                        |
-                                                 editar archivos
-                                                        |
-[Puente OS] <--PUT /studio/artefactos/{id}-- [app_content completo]
+[Puente OS] --GET /studio/artefactos/group/{group_id}--> [app_content en memoria]
+                                                                    |
+                                                             editar archivos
+                                                                    |
+[Puente OS] <--PUT /studio/artefactos/group/{group_id}-- [app_content completo]
 ```
 
 ### Crear una tabla y cargar datos
@@ -1082,13 +1186,13 @@ node app/pull_artefacto.js {id}         # descarga a app/files/
 ## Reglas de comportamiento del agente
 
 1. **Verificar credenciales primero** — nunca ejecutes un request si `BASE_URL` o `STUDIO_KEY` son los placeholders literales.
-2. **Confirmar antes de operaciones destructivas** — regenerar API key, hacer PUT con `app_content` nuevo, crear tablas (son difíciles de eliminar). Informa al usuario del impacto antes de ejecutar.
+2. **Confirmar antes de operaciones destructivas** — regenerar API key, hacer PUT con `app_content` nuevo, crear tablas (son difíciles de eliminar), y migrar el esquema de una tabla con `PUT /studio/tablas/{tabla_id}/estructura` (elimina columnas y sus datos de forma irreversible). Informa al usuario del impacto antes de ejecutar.
 3. **Preservar el `app_content` completo en updates** — siempre haz GET primero, modifica en memoria, luego PUT con todo.
 4. **Reportar IDs y keys inmediatamente** — al crear un artefacto o regenerar una key, muestra y guarda el `id`, `public_id` y `api_key` en la respuesta al usuario antes de continuar.
 5. **No usar STUDIO_KEY en código de frontend** — es una credencial privada. El frontend usa exclusivamente `puente_artifact_xxx`.
 6. **Proponer estructura antes de codificar** — si el usuario pide una app nueva, describe la arquitectura propuesta (vistas, tablas, componentes) y espera confirmación antes de generar código.
 7. **Usar `/meta` para el link público** — cuando el usuario pida el link o URL de una app, usa SIEMPRE `GET /studio/artefactos/group/{group_id}/meta` o `GET /studio/artefactos/{id}/meta` para obtener el `public_id` y construir `https://app.puente.xyz/public/{public_id}/`. Nunca uses el GET completo del artefacto solo para esto.
-8. **Pushear siempre por `group_id`** — el único endpoint de actualización es `PUT /studio/artefactos/group/{group_id}`. Nunca uses el `id` numérico para pushes, ya que cambia con cada versión nueva. El `group_id` es estable para siempre.
+8. **Pushear siempre por `group_id`** — el único endpoint de actualización de `app_content` es `PUT /studio/artefactos/group/{group_id}`. Nunca uses el `id` numérico para pushes, ya que cambia con cada versión nueva. El `group_id` es estable para siempre. Ese mismo endpoint también cambia `titulo` y `descripcion` sin versionar si lo llamas sin `app_content`; la única excepción que exige el `id` numérico es `PUT /studio/artefactos/{id}/meta` para `slug` y `sharing_mode`, y ahí debes resolver el `id` vigente justo antes de llamarlo.
 9. **Reportar y guardar el `group_id`** — al crear un artefacto, muestra el `artefacto_group_id` al usuario e indícale que lo guarde. Es el identificador que necesitará para todos los pushes futuros.
 
 ---

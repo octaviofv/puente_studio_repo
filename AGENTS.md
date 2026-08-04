@@ -60,14 +60,16 @@ node app/pull_artefacto.js <id>
 # 3. Convert the files to JSON
 node app/files_to_json.js
 
-# 4. Upload the changes
-curl -X PUT "$BASE_URL/studio/artefactos/<id>" \
+# 4. Upload the changes (always by group_id, never by the numeric id)
+curl -X PUT "$BASE_URL/studio/artefactos/group/<group_id>" \
   -H "X-API-Key: $STUDIO_KEY" \
   -H "Content-Type: application/json" \
   -d @app/output.json
 ```
 
 The PUT replaces the complete `app_content`. Always follow GET → edit → complete PUT. Never upload only the modified files.
+
+`PUT /studio/artefactos/group/{group_id}` is the only update endpoint. The numeric `id` identifies a single version row and changes with every push; `artefacto_group_id` is stable. `pull_artefacto.js` prints the `group_id`, and `GET /studio/artefactos/{id}/meta` returns it.
 
 ### Create a new application
 
@@ -135,7 +137,7 @@ Never use `STUDIO_KEY` inside published application source code.
 | URL | Purpose |
 |---|---|
 | `https://app.puente.xyz/public/{public_id}/` | End-user application URL |
-| `{BASE_URL}/studio/artefactos/{id}` | Private management API |
+| `{BASE_URL}/studio/artefactos/group/{group_id}` | Private management API |
 | `{BASE_URL}/public/artefacto/{id}/tablas/{tabla_id}/datos` | Public application data API |
 
 ## Endpoint quick reference
@@ -143,12 +145,16 @@ Never use `STUDIO_KEY` inside published application source code.
 | Action | Method | Endpoint |
 |---|---|---|
 | List applications | GET | `/studio/artefactos` |
-| Get application | GET | `/studio/artefactos/{id}` |
+| Get application (current version) | GET | `/studio/artefactos/group/{group_id}` |
+| Get application (specific version) | GET | `/studio/artefactos/{id}` |
 | Create application | POST | `/studio/artefactos` |
-| Update application | PUT | `/studio/artefactos/{id}` |
+| Update application (only update endpoint) | PUT | `/studio/artefactos/group/{group_id}` |
 | Get metadata and `public_id` | GET | `/studio/artefactos/{id}/meta` |
+| Update `slug` / `sharing_mode` | PUT | `/studio/artefactos/{id}/meta` |
 | List tables | GET | `/studio/tablas` |
 | Create table | POST | `/studio/tablas` |
+| Get table column structure | GET | `/studio/tablas/{tabla_id}/estructura` |
+| **Migrate table schema (destructive)** | PUT | `/studio/tablas/{tabla_id}/estructura` |
 | Read rows | GET | `/studio/tablas/{tabla_id}/datos` |
 | Insert row | POST | `/studio/tablas/{tabla_id}/datos` |
 | Bulk insert | POST | `/studio/tablas/{tabla_id}/datos/bulk` |

@@ -195,9 +195,11 @@ async function main() {
     const titulo = data.titulo || data.artefacto?.titulo
         || (isDirectFmt ? `Artefacto ${artefactoId}` : '(sin título)');
     const descripcion = data.descripcion || data.artefacto?.descripcion || '';
+    const groupId = data.artefacto_group_id || data.artefacto?.artefacto_group_id || null;
 
     console.log(`✅  Artefacto encontrado:`);
     console.log(`    📌  ID         : ${artefactoId}`);
+    if (groupId) console.log(`    🔑  group_id   : ${groupId}`);
     console.log(`    📋  Título     : ${titulo}`);
     if (descripcion) console.log(`    📝  Descripción: ${descripcion}`);
 
@@ -256,7 +258,13 @@ async function main() {
     console.log(`\n📝  Próximos pasos:`);
     console.log(`    1. Edita los archivos en ${path.relative(rootDir, outputDir)}/`);
     console.log(`    2. Convierte a JSON:   node app/files_to_json.js ./app/files ./app/output.json`);
-    console.log(`    3. Sube los cambios:   curl -X PUT $BASE_URL/studio/artefactos/${artefactoId} -H "X-API-Key: $STUDIO_KEY" ...`);
+    if (groupId) {
+        console.log(`    3. Sube los cambios:   curl -X PUT $BASE_URL/studio/artefactos/group/${groupId} -H "X-API-Key: $STUDIO_KEY" -H "Content-Type: application/json" -d @app/output.json`);
+    } else {
+        console.log(`    3. Obtén el group_id:  curl $BASE_URL/studio/artefactos/${artefactoId}/meta -H "X-API-Key: $STUDIO_KEY"`);
+        console.log(`    4. Sube los cambios:   curl -X PUT $BASE_URL/studio/artefactos/group/<group_id> -H "X-API-Key: $STUDIO_KEY" -H "Content-Type: application/json" -d @app/output.json`);
+    }
+    console.log(`\n⚠️   Pushea siempre por group_id — el id numérico cambia con cada versión.`);
     console.log('');
 }
 
