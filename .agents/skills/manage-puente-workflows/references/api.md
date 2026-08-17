@@ -30,6 +30,10 @@ Send `X-API-Key: <STUDIO_KEY>` on every request. The credential selects and rest
 | Action | Method and path | Notes |
 |---|---|---|
 | Integration catalog | `GET /workflows/integrations` | Use to discover valid `node_id` values and their public input schemas. |
+| Create Google Sheets link | `POST /studio/integrations/google-sheets/connect-link` | Returns only `connection_id`, `connect_link`, and `expires_at`. Never include a team ID. |
+| List Google Sheets connections | `GET /studio/integrations/connections?provider=google-sheets` | Returns public connection records for the credential's team. |
+| Read Google Sheets connection | `GET /studio/integrations/connections/{connection_id}` | Check status after the user replies Done. |
+| Verify Google Sheet access | `POST /studio/integrations/connections/{connection_id}/verify` | Send one literal spreadsheet URL; reference probes do not alter credential status. |
 | List definitions | `GET /workflows/` | Latest version per group by default. |
 | List version history | `GET /workflows/?all_versions=true` | Used to inspect a version or group locally. |
 | Create definition | `POST /workflows/` | Omit `scenario_group_id`; acknowledge automatic service effects. |
@@ -37,6 +41,9 @@ Send `X-API-Key: <STUDIO_KEY>` on every request. The credential selects and rest
 | Change saved status | `PUT /workflows/{scenario_id}/status` | Use a version ID; activation requires explicit confirmation. |
 
 No other workflow action is part of this skill.
+
+The Google Sheets endpoints are Studio-key-only. Never substitute a JWT, pass
+`equipo_id`, log a connect link, or expose a Nango session token or identifier.
 
 ## Node definitions
 

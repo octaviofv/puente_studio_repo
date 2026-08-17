@@ -28,6 +28,7 @@ Read [references/api.md](references/api.md) before preparing a request. Read [re
 - List saved workflows: call `GET /workflows/`.
 - Inspect a version or stable group: call `GET /workflows/?all_versions=true` and filter the returned definitions by `id` or `scenario_group_id`.
 - Discover valid node types: call `GET /workflows/integrations`.
+- Connect Google Sheets: use the Studio integration flow below before building a Sheets node.
 - Create a workflow: call `POST /workflows/` with a complete JSON definition and acknowledged automatic service effects.
 - Update a definition: call `POST /workflows/` with the stable `scenario_group_id`, a complete JSON definition, and acknowledged automatic service effects.
 - Change saved status: call `PUT /workflows/{scenario_id}/status` with a version `id`; activating requires separate explicit confirmation.
@@ -59,6 +60,34 @@ Treat `scenario_group_id` as the stable workflow identity and `id` as one saved 
 - Expect the new version to have `is_latest=true`.
 
 The Studio credential is bound to one team. Omit `equipo_id` to use that team. Never attempt another team ID.
+
+## Google Sheets OAuth in chat
+
+When a requested workflow needs a Google Sheets node, first query the live
+catalog and confirm that it returns the intended Sheets action and its
+`input_schema`. Then run this pause-and-resume flow using the same Studio key:
+
+1. Call `POST /studio/integrations/google-sheets/connect-link` and show the
+   returned `connect_link` directly to the user. Keep only its opaque
+   `connection_id`; never expose or retain a session token, Nango identifier,
+   credential, or team argument.
+2. Ask the user to complete consent in their external browser and reply
+   **Done**. Do not poll or make workflow changes while waiting.
+3. After the reply, call `GET /studio/integrations/connections/{connection_id}`.
+   If it is not `active`, explain the returned public status and offer a fresh
+   link; do not guess that authorization completed.
+4. Once active, ask for the literal `docs.google.com/spreadsheets/d/...` URL.
+   Call `POST /studio/integrations/connections/{connection_id}/verify` with
+   only `{ "spreadsheet": "<literal URL>" }`. A bad reference or inaccessible
+   sheet does not authorize changing the connection or the workflow.
+5. Use the opaque `connection_id` and literal sheet reference in node `inputs`
+   only when both fields are supported by that live catalog entry. Collect any
+   other required inputs, prepare the complete draft definition/version, and
+   obtain the existing explicit confirmation before `POST /workflows/`.
+
+Do not use a CLI command, accept or send `equipo_id`, expose the Studio key,
+execute a workflow, or save an active workflow without the separate activation
+confirmation required above.
 
 ## Distinguish management from execution
 

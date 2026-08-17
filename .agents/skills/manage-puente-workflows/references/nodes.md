@@ -183,6 +183,27 @@ decrypted. Do not rely on partial rows.
 This input does not change the Studio table API or a published application's
 table API: those ordinary reads continue to return `kms:v1:...` ciphertext.
 
+## Google Sheets nodes and chat OAuth
+
+Use this section only after `GET /workflows/integrations` returns the desired
+Google Sheets action. The live catalog is authoritative for the exact
+`node_id`, required inputs, and input names.
+
+Do not invent `connection_id`, `spreadsheet`, or `range` fields. Create a
+connection through `POST /studio/integrations/google-sheets/connect-link`, show
+the returned link to the user, and wait for their external-browser consent and
+**Done** reply. Check the returned opaque connection with
+`GET /studio/integrations/connections/{connection_id}` before asking for the
+literal Google Sheet URL. Verify that URL with
+`POST /studio/integrations/connections/{connection_id}/verify`.
+
+Only after the connection is `active` and access is verified may a definition
+use the opaque `connection_id` and literal sheet reference, and only when the
+selected live catalog schema supports them. Never use a CLI command, a team
+argument, a session token, Nango ID, credential, or authorization URL as a
+workflow value. Keep the workflow as a complete `draft` definition/version
+until the author provides the required explicit confirmation.
+
 ## Edges
 
 Edges use workflow context keys, not catalog `node_id` values:
