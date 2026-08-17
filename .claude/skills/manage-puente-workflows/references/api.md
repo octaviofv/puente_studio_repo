@@ -30,7 +30,7 @@ Send `X-API-Key: <STUDIO_KEY>` on every request. The credential selects and rest
 | Action | Method and path | Notes |
 |---|---|---|
 | Integration catalog | `GET /workflows/integrations` | Use to discover valid `node_id` values and their public input schemas. |
-| Create Google Sheets link | `POST /studio/integrations/google-sheets/connect-link` | Returns only `connection_id`, `connect_link`, and `expires_at`. Never include a team ID. |
+| Create Google Sheets link | `POST /studio/integrations/google-sheets/connect-link` | Send no request body. Returns only `connection_id`, `connect_link`, and `expires_at`. Never include a team ID. |
 | List Google Sheets connections | `GET /studio/integrations/connections?provider=google-sheets` | Returns public connection records for the credential's team. |
 | Read Google Sheets connection | `GET /studio/integrations/connections/{connection_id}` | Check status after the user replies Done. |
 | Verify Google Sheet access | `POST /studio/integrations/connections/{connection_id}/verify` | Send one literal spreadsheet URL; reference probes do not alter credential status. |

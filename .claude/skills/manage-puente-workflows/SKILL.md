@@ -67,7 +67,8 @@ When a requested workflow needs a Google Sheets node, first query the live
 catalog and confirm that it returns the intended Sheets action and its
 `input_schema`. Then run this pause-and-resume flow using the same Studio key:
 
-1. Call `POST /studio/integrations/google-sheets/connect-link` and show the
+1. Call `POST /studio/integrations/google-sheets/connect-link` without a
+   request body and show the
    returned `connect_link` directly to the user. Keep only its opaque
    `connection_id`; never expose or retain a session token, Nango identifier,
    credential, or team argument.

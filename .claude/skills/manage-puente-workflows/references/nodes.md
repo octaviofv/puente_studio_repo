@@ -190,7 +190,8 @@ Google Sheets action. The live catalog is authoritative for the exact
 `node_id`, required inputs, and input names.
 
 Do not invent `connection_id`, `spreadsheet`, or `range` fields. Create a
-connection through `POST /studio/integrations/google-sheets/connect-link`, show
+connection through `POST /studio/integrations/google-sheets/connect-link` with
+no request body, then show
 the returned link to the user, and wait for their external-browser consent and
 **Done** reply. Check the returned opaque connection with
 `GET /studio/integrations/connections/{connection_id}` before asking for the
