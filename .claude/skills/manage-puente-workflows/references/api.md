@@ -5,7 +5,6 @@
 - Scope
 - Configuration and authentication
 - Available actions
-- Google Sheets connection actions
 - Payloads
 - Node definitions
 - Definition-management flows
@@ -31,22 +30,13 @@ Send `X-API-Key: <STUDIO_KEY>` on every request. The credential supplies the com
 | Action | Method and path | Notes |
 |---|---|---|
 | Integration catalog | `GET /workflows/integrations` | Use to discover valid `node_id` values and their public input schemas. |
-| Create Google Sheets link | `POST /studio/integrations/google-sheets/connect-link` | Body is optional; when present, it may contain only `display_name`. Returns `connection_id`, `connect_link`, and `expires_at`. |
-| List Google Sheets connections | `GET /studio/integrations/connections?provider=google-sheets` | Returns public connection records for the credential's team. |
-| Read Google Sheets connection | `GET /studio/integrations/connections/{connection_id}?provider=google-sheets` | Inspect one opaque team-scoped connection. |
-| Verify Google Sheet access | `POST /studio/integrations/connections/{connection_id}/verify` | Send a spreadsheet ID or supported Google Sheets URL; access probes do not alter credential status. |
-| Disconnect Google Sheets | `DELETE /studio/integrations/connections/{connection_id}?provider=google-sheets` | User-requested disconnect; success is `204 No Content`. |
 | List definitions | `GET /workflows/` | Latest version per group by default. |
 | List version history | `GET /workflows/?all_versions=true` | Used to inspect a version or group locally. |
 | Create definition | `POST /workflows/` | Omit `scenario_group_id`; acknowledge automatic service effects. |
 | Create updated version | `POST /workflows/` | Include `scenario_group_id`, the complete definition, and acknowledged side effects. |
 | Change saved status | `PUT /workflows/{scenario_id}/status` | Use a version ID; activation requires explicit confirmation. |
 
-No other workflow-definition action is part of this skill.
-
-## Google Sheets connection actions
-
-The Google Sheets routes are Studio-key-only. Google Sheets nodes use an opaque, team-scoped `connection_id`. Read [google-sheets.md](google-sheets.md) for the authorization flow and exact connection and action contracts. Never substitute a JWT, pass `equipo_id`, log a connect link, or expose a provider session token or identifier. These routes do not expand the workflow-definition surface above; `manual_execution_allowed` metadata does not authorize this skill to call workflow execution endpoints.
+No other workflow-definition action is part of this skill. Connection management is documented separately in [integrations.md](integrations.md); provider action contracts remain in [gmail.md](gmail.md) and [google-sheets.md](google-sheets.md).
 
 ## Node definitions
 

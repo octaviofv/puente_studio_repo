@@ -3,7 +3,7 @@
 ## Contents
 
 - Discover the live contract
-- Authorize and manage a connection
+- Google Sheets connection behavior
 - Shared input and metadata meanings
 - Batch get values
 - Batch get values by data filter
@@ -23,44 +23,52 @@ The OpenAPI action entry supplies `action_name`, `mutates`, `manual_execution_al
 
 The production schema can be cross-checked at `https://api.puente.xyz/openapi.json`. The authenticated integrations catalog still controls which nodes are currently selectable for the Studio key's environment.
 
-## Authorize and manage a connection
+## Google Sheets connection behavior
 
-Use `X-API-Key: <STUDIO_KEY>` for every route below. The Studio key supplies company, team, and user identity. Never put it in browser code, a published application, a URL, or a report, and never ask for or infer another `equipo_id`.
+First follow the shared discovery, selection, readiness, and authorization flow
+in [integrations.md](integrations.md). Google Sheets uses:
 
-1. Create a short-lived authorization link:
+- action prefix `google_sheets.*`;
+- connection provider `google-sheets`;
+- `GET /studio/integrations/connections?provider=google-sheets` to list
+  connections;
+- `GET /studio/integrations/connections/{connection_id}?provider=google-sheets`
+  to read one connection;
+- `DELETE /studio/integrations/connections/{connection_id}?provider=google-sheets`
+  to disconnect only when requested.
 
-   ```http
-   POST /studio/integrations/google-sheets/connect-link
-   X-API-Key: <STUDIO_KEY>
-   Content-Type: application/json
+Only after the user chooses a new Google Sheets connection, create its link:
 
-   {"display_name":"Finance Sheets"}
-   ```
+```http
+POST /studio/integrations/google-sheets/connect-link
+X-API-Key: <STUDIO_KEY>
+Content-Type: application/json
 
-   The body is optional; `display_name` is an optional human-facing label of at most 120 characters. The response contains:
+{"display_name":"Finance Sheets"}
+```
 
-   - `connection_id`: opaque Puente identifier for this team-scoped connection;
-   - `connect_link`: short-lived URL the user opens in a browser to authorize Google;
-   - `expires_at`: time at which that authorization link expires.
+The body is optional. `display_name` is an optional human-facing label of at
+most 120 characters. The response contains:
 
-2. Show `connect_link` directly in chat without logging it. Ask the user to complete Google authorization in their browser and reply when done. Do not poll or change a workflow while waiting, and do not treat link creation alone as successful authorization.
-3. Discover the team's saved connections with `GET /studio/integrations/connections?provider=google-sheets`.
-4. Inspect one connection with `GET /studio/integrations/connections/{connection_id}?provider=google-sheets`. Continue only when its public status is active; otherwise report that status and offer a fresh authorization link.
-5. Verify that the connection can access the intended spreadsheet. `spreadsheet` is the spreadsheet ID or supported Google Sheets URL to probe:
+- `connection_id`: opaque Puente identifier for this team-scoped connection;
+- `connect_link`: short-lived authorization URL;
+- `expires_at`: time at which that authorization link expires.
 
-   ```http
-   POST /studio/integrations/connections/{connection_id}/verify
-   X-API-Key: <STUDIO_KEY>
-   Content-Type: application/json
+After either selecting an existing active connection or authorizing a new one,
+verify access to the intended spreadsheet. `spreadsheet` is the spreadsheet ID
+or supported Google Sheets URL to probe:
 
-   {"spreadsheet":"<spreadsheet ID or Google Sheets URL>"}
-   ```
+```http
+POST /studio/integrations/connections/{connection_id}/verify
+X-API-Key: <STUDIO_KEY>
+Content-Type: application/json
 
-6. Only when the user requests disconnection, call `DELETE /studio/integrations/connections/{connection_id}?provider=google-sheets`. Success is `204 No Content`.
+{"spreadsheet":"<spreadsheet ID or Google Sheets URL>"}
+```
 
-`connection_id` is not a Google token, provider connection ID, or email address. Treat it as an opaque literal scoped to the Studio key's team. It does not support workflow-value interpolation. Never expose underlying provider credentials.
-
-Keep the authorization interaction in chat; do not hand the user terminal commands. A failed spreadsheet probe does not authorize changing the connection or workflow.
+An access probe does not alter connection status. A failed probe does not
+authorize changing, replacing, or disconnecting the connection. A requested
+disconnect succeeds with `204 No Content`.
 
 ## Shared input and metadata meanings
 
