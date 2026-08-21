@@ -21,13 +21,14 @@ Never print the key, place it in a URL, write it into generated source code, or 
 
 ## Load the contract
 
-Read [references/api.md](references/api.md) before preparing a request. Read [references/nodes.md](references/nodes.md) before creating or changing `nodes`, `edges`, node inputs, or cross-node references. For Google Sheets authorization, connections, or nodes, also read [references/google-sheets.md](references/google-sheets.md). Use only the public HTTP methods and paths documented in those references.
+Read [references/api.md](references/api.md) before preparing a request. Read [references/nodes.md](references/nodes.md) before creating or changing `nodes`, `edges`, node inputs, or cross-node references. For Gmail authorization, connections, or nodes, also read [references/gmail.md](references/gmail.md). For Google Sheets authorization, connections, or nodes, also read [references/google-sheets.md](references/google-sheets.md). Use only the public HTTP methods and paths documented in those references.
 
 ## Choose an operation
 
 - List saved workflows: call `GET /workflows/`.
 - Inspect a version or stable group: call `GET /workflows/?all_versions=true` and filter the returned definitions by `id` or `scenario_group_id`.
 - Discover valid node types: call `GET /workflows/integrations`.
+- Connect Gmail: use [references/gmail.md](references/gmail.md) before building a Gmail node.
 - Connect Google Sheets: use [references/google-sheets.md](references/google-sheets.md) before building a Sheets node.
 - Create a workflow: call `POST /workflows/` with a complete JSON definition and acknowledged automatic service effects.
 - Update a definition: call `POST /workflows/` with the stable `scenario_group_id`, a complete JSON definition, and acknowledged automatic service effects.
