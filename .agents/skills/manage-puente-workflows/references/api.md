@@ -7,6 +7,7 @@
 - Available actions
 - Gmail connection actions
 - Google Sheets connection actions
+- OAuth connection-first interaction
 - Payloads
 - Node definitions
 - Definition-management flows
@@ -56,6 +57,31 @@ The Gmail routes are Studio-key-only. Gmail nodes use an opaque, team-scoped `co
 ## Google Sheets connection actions
 
 The Google Sheets routes are Studio-key-only. Google Sheets nodes use an opaque, team-scoped `connection_id`. Read [google-sheets.md](google-sheets.md) for the authorization flow and exact connection and action contracts. Never substitute a JWT, pass `equipo_id`, log a connect link, or expose a provider session token or identifier. These routes do not expand the workflow-definition surface above; `manual_execution_allowed` metadata does not authorize this skill to call workflow execution endpoints.
+
+## OAuth connection-first interaction
+
+Before calling any provider's connect-link endpoint, call its documented
+connection-list endpoint and filter the public response to `status: "active"`.
+For each ready connection, show the user:
+
+```text
+<display_name> — <provider_identity>
+```
+
+`provider_identity` is the connected account email when the provider supplies
+one. If it is `null`, show `display_name` without inventing an email. Number the
+choices when needed, retain the corresponding opaque `connection_id`, and ask
+whether to reuse one or create a new connection. Do not show a connection as
+ready unless its public status is exactly `active`.
+
+Only call a connect-link endpoint after the user chooses the new-connection
+path. Then show the returned short-lived link, wait for the user to complete
+authorization, and read the new connection's public status. Link creation alone
+does not establish a usable connection.
+
+This ordering applies to Gmail, Google Sheets, and future OAuth-backed
+integrations that publish equivalent Studio routes. It does not authorize
+guessing provider names, routes, response fields, or connection semantics.
 
 ## Node definitions
 

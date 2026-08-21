@@ -27,7 +27,40 @@ The production schema can be cross-checked at `https://api.puente.xyz/openapi.js
 
 Use `X-API-Key: <STUDIO_KEY>` for every route below. The Studio key supplies company, team, and user identity. Never put it in browser code, a published application, a URL, or a report, and never ask for or infer another `equipo_id`.
 
-1. Create a short-lived authorization link:
+1. Before creating any authorization link, discover the team's saved Google
+   Sheets connections with:
+
+   ```http
+   GET /studio/integrations/connections?provider=google-sheets
+   X-API-Key: <STUDIO_KEY>
+   ```
+
+   Each public record contains `connection_id`, `provider`, `display_name`,
+   `provider_identity`, `status`, `team_id`, `created_at`, and `updated_at`.
+   `provider_identity` is the connected Google account email when available.
+
+2. Show the records whose `status` is exactly `active`, using a numbered list
+   when there is more than one:
+
+   ```text
+   Google Sheets connections ready to use:
+   1. Finance Sheets — finance@example.com
+   2. Operations Sheets — operations@example.com
+
+   Would you like to use an existing connection or create a new one?
+   ```
+
+   If `provider_identity` is `null`, show only `display_name`; never invent an
+   email. Retain the opaque `connection_id` behind each displayed choice. Do not
+   present `needs_reauth` or `not_accessible` records as ready. If there are no
+   active records, say so and offer to create a new connection.
+
+3. If the user chooses an existing connection, inspect it with
+   `GET /studio/integrations/connections/{connection_id}?provider=google-sheets`
+   and continue only while its public `status` remains `active`.
+
+4. Only if the user chooses a new connection, create a short-lived authorization
+   link:
 
    ```http
    POST /studio/integrations/google-sheets/connect-link
@@ -43,10 +76,15 @@ Use `X-API-Key: <STUDIO_KEY>` for every route below. The Studio key supplies com
    - `connect_link`: short-lived URL the user opens in a browser to authorize Google;
    - `expires_at`: time at which that authorization link expires.
 
-2. Show `connect_link` directly in chat without logging it. Ask the user to complete Google authorization in their browser and reply when done. Do not poll or change a workflow while waiting, and do not treat link creation alone as successful authorization.
-3. Discover the team's saved connections with `GET /studio/integrations/connections?provider=google-sheets`.
-4. Inspect one connection with `GET /studio/integrations/connections/{connection_id}?provider=google-sheets`. Continue only when its public status is active; otherwise report that status and offer a fresh authorization link.
-5. Verify that the connection can access the intended spreadsheet. `spreadsheet` is the spreadsheet ID or supported Google Sheets URL to probe:
+5. Show `connect_link` directly in chat without logging it. Ask the user to
+   complete Google authorization in their browser and reply when done. Do not
+   poll or change a workflow while waiting, and do not treat link creation alone
+   as successful authorization.
+6. After the user replies, inspect the new connection by its returned
+   `connection_id`. Continue only when its public `status` is `active`.
+7. For either a reused or newly authorized active connection, verify that it can
+   access the intended spreadsheet. `spreadsheet` is the spreadsheet ID or
+   supported Google Sheets URL to probe:
 
    ```http
    POST /studio/integrations/connections/{connection_id}/verify
@@ -56,7 +94,7 @@ Use `X-API-Key: <STUDIO_KEY>` for every route below. The Studio key supplies com
    {"spreadsheet":"<spreadsheet ID or Google Sheets URL>"}
    ```
 
-6. Only when the user requests disconnection, call `DELETE /studio/integrations/connections/{connection_id}?provider=google-sheets`. Success is `204 No Content`.
+8. Only when the user requests disconnection, call `DELETE /studio/integrations/connections/{connection_id}?provider=google-sheets`. Success is `204 No Content`.
 
 `connection_id` is not a Google token, provider connection ID, or email address. Treat it as an opaque literal scoped to the Studio key's team. It does not support workflow-value interpolation. Never expose underlying provider credentials.
 

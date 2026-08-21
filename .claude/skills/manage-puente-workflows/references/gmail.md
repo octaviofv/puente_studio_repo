@@ -30,7 +30,40 @@ The production schema can be cross-checked at `https://api.puente.xyz/openapi.js
 
 Use `X-API-Key: <STUDIO_KEY>` for every route below. The Studio key supplies company, team, and user identity. Never put it in browser code, a published application, a URL, or a report, and never send an `equipo_id` selector.
 
-1. Create a short-lived authorization link:
+1. Before creating any authorization link, discover the team's saved Gmail
+   connections with:
+
+   ```http
+   GET /studio/integrations/connections?provider=gmail
+   X-API-Key: <STUDIO_KEY>
+   ```
+
+   Each public record contains `connection_id`, `provider`, `display_name`,
+   `provider_identity`, `status`, `team_id`, `created_at`, and `updated_at`.
+   `provider_identity` is the connected Gmail account email when available.
+
+2. Show the records whose `status` is exactly `active`, using a numbered list
+   when there is more than one:
+
+   ```text
+   Gmail connections ready to use:
+   1. Support Gmail — support@example.com
+   2. Billing Gmail — billing@example.com
+
+   Would you like to use an existing connection or create a new one?
+   ```
+
+   If `provider_identity` is `null`, show only `display_name`; never invent an
+   email. Retain the opaque `connection_id` behind each displayed choice. Do not
+   present `needs_reauth` or `not_accessible` records as ready. If there are no
+   active records, say so and offer to create a new connection.
+
+3. If the user chooses an existing connection, inspect it with
+   `GET /studio/integrations/connections/{connection_id}?provider=gmail` and use
+   it only while its public `status` remains `active`.
+
+4. Only if the user chooses a new connection, create a short-lived authorization
+   link:
 
    ```http
    POST /studio/integrations/gmail/connect-link
@@ -46,10 +79,15 @@ Use `X-API-Key: <STUDIO_KEY>` for every route below. The Studio key supplies com
    - `connect_link`: short-lived URL the user opens in a browser to authorize Gmail;
    - `expires_at`: time at which that authorization link expires.
 
-2. Show `connect_link` directly in chat without logging it. Ask the user to complete Google authorization in their browser and reply when done. Do not poll or change a workflow while waiting, and do not treat link creation alone as successful authorization.
-3. Discover the team's saved Gmail connections with `GET /studio/integrations/connections?provider=gmail`.
-4. Inspect one connection with `GET /studio/integrations/connections/{connection_id}?provider=gmail`. Continue only when its public `status` is `active`. A connection may instead report `needs_reauth` or `not_accessible`; report that state and offer a fresh authorization link.
-5. Only when the user requests disconnection, call `DELETE /studio/integrations/connections/{connection_id}?provider=gmail`. Success is `204 No Content`.
+5. Show `connect_link` directly in chat without logging it. Ask the user to
+   complete Google authorization in their browser and reply when done. Do not
+   poll or change a workflow while waiting, and do not treat link creation alone
+   as successful authorization.
+6. After the user replies, inspect the new connection by its returned
+   `connection_id`. Continue only when its public `status` is `active`. A
+   connection may instead report `needs_reauth` or `not_accessible`; report that
+   state and offer a fresh authorization link.
+7. Only when the user requests disconnection, call `DELETE /studio/integrations/connections/{connection_id}?provider=gmail`. Success is `204 No Content`.
 
 There is no Gmail variant of the Studio spreadsheet-verification request. Do not call `/verify` for Gmail.
 

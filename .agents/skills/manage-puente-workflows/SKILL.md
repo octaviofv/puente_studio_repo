@@ -35,6 +35,27 @@ Read [references/api.md](references/api.md) before preparing a request. Read [re
 - Change saved status: call `PUT /workflows/{scenario_id}/status` with a version `id`; activating requires separate explicit confirmation.
 - Delete or run a workflow: state that the operation is outside this skill and do nothing.
 
+## Reuse OAuth connections before authorizing
+
+For Gmail, Google Sheets, and every future OAuth-backed integration with a
+documented Studio connection surface, always perform connection discovery
+before creating an authorization link:
+
+1. List the provider's saved connections through its documented Studio route.
+2. Present the connections whose public `status` is `active`, using
+   `display_name` and `provider_identity` (the connected account email when
+   available). Keep each opaque `connection_id` mapped to the displayed choice.
+3. Ask whether the user wants one of those existing connections or a new one.
+4. Reuse the selected active connection immediately. Create a connect link only
+   after the user chooses a new connection; do not create one preemptively.
+5. After new authorization, read the connection again and continue only when it
+   reports `active`.
+
+Do not present `needs_reauth` or `not_accessible` connections as ready to use.
+Report their status separately when useful. If there are no active connections,
+say so and offer the new-connection flow. Never invent connection routes for a
+future provider; use only its published reference and live public contract.
+
 ## Before changing a definition
 
 1. Inspect the current saved definition through `GET /workflows/?all_versions=true`.
