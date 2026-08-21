@@ -105,7 +105,8 @@ Important fields:
 
 ```text
 id, scenario_group_id, version, is_latest, nombre, descripcion,
-nodes, edges, status, equipo_id, created_by_user_id, created_at, updated_at
+nodes, edges, status, equipo_id, webhook_url, sync_webhook_id,
+created_by_user_id, created_at, updated_at, validation_warnings
 ```
 
 ## Definition-management flows
@@ -134,8 +135,9 @@ Send the complete definition with `scenario_group_id` absent or `null`. Record t
 The Puente service also:
 
 - generates a `sync_webhook_id` for a new workflow;
-- attempts Hookdeck webhook provisioning and may persist `webhook_url`;
-- can therefore create external webhook state even though this skill calls only the definition endpoint.
+- may persist a legacy `webhook_url` response field;
+- exposes its fixed synchronous webhook endpoint from the configured Puente API
+  origin even though this skill calls only the definition endpoint.
 
 Explain these effects and obtain explicit user confirmation before sending the request.
 
@@ -147,10 +149,33 @@ There is no partial definition update.
 2. Copy `nombre`, `descripcion`, `nodes`, `edges`, and `status` into a new payload.
 3. Set `scenario_group_id` to the existing stable group ID.
 4. Apply the requested edits.
-5. Explain that the new version inherits `sync_webhook_id` and scheduling metadata from the prior version and that the service attempts Hookdeck provisioning for the new version.
+5. Explain that the new version inherits `sync_webhook_id` and scheduling metadata from the prior version, preserving the fixed Puente webhook endpoint.
 6. Obtain explicit user confirmation of the automatic service effects.
 7. POST the complete payload once.
 8. Verify that `version` increased and `is_latest` is true.
+
+### Derive user-facing URLs
+
+Use only these configured API origins:
+
+| Environment | API origin | Derived webhook endpoint | Frontend editor URL |
+|---|---|---|---|
+| Production | `https://api.puente.xyz` | `https://api.puente.xyz/workflows/webhook/{sync_webhook_id}` | `https://app.puente.xyz/workflows/{scenario_group_id}/edit` |
+| Staging | `https://staging.puente.xyz` | `https://staging.puente.xyz/workflows/webhook/{sync_webhook_id}` | Not defined by this contract; do not invent one. |
+
+The stable `scenario_group_id` identifies the workflow project across versions
+and is the UUID in the production editor route. The `id` field identifies one
+saved version and must not be substituted into that route.
+
+Build the webhook endpoint from the normalized configured API origin and
+`sync_webhook_id`. This matches the Puente frontend behavior. Treat
+`webhook_url` as a legacy fallback field, and do not surface a different
+webhook host or webhook subdomain. If either required value is absent or the
+configured origin is unsupported, state that the URL cannot be derived.
+
+Always label the editor URL and webhook endpoint separately. When a user asks
+to open the workflow or project in the frontend, return the editor URL rather
+than the webhook endpoint.
 
 ### Change saved status
 
