@@ -1,6 +1,6 @@
 ---
 name: manage-puente-workflows
-description: Manage Puente workflow definitions from puente_studio_repo with the repository STUDIO_KEY. Use when an external Puente Studio user needs to list or inspect workflows, create a draft workflow, create a complete new version, or change a saved workflow version's status. Disclose automatic webhook and scheduling side effects, require explicit activation confirmation, and never call workflow run endpoints.
+description: Manage Puente workflow definitions and connection-backed workflow integrations from puente_studio_repo with the repository STUDIO_KEY. Use when an external Puente Studio user needs to configure Gmail or Google Sheets connections and nodes, reuse or authorize an integration account, inspect workflows, create a draft or complete new version, connect nodes and edges, or change a saved workflow version's status. Disclose automatic webhook and scheduling side effects, require explicit activation confirmation, and never call workflow run endpoints.
 ---
 
 # Manage Puente Workflows
@@ -21,40 +21,22 @@ Never print the key, place it in a URL, write it into generated source code, or 
 
 ## Load the contract
 
-Read [references/api.md](references/api.md) before preparing a request. Read [references/nodes.md](references/nodes.md) before creating or changing `nodes`, `edges`, node inputs, or cross-node references. For Gmail authorization, connections, or nodes, also read [references/gmail.md](references/gmail.md). For Google Sheets authorization, connections, or nodes, also read [references/google-sheets.md](references/google-sheets.md). Use only the public HTTP methods and paths documented in those references.
+Read [references/api.md](references/api.md) before preparing a workflow-definition request. Read [references/nodes.md](references/nodes.md) before creating or changing `nodes`, `edges`, node inputs, or cross-node references.
+
+For any connection-backed integration, first read [references/integrations.md](references/integrations.md). Then read only the selected provider reference: [references/gmail.md](references/gmail.md) for Gmail or [references/google-sheets.md](references/google-sheets.md) for Google Sheets. Do not load every provider reference when only one integration is involved. Use only the public HTTP methods and paths documented in those references.
 
 ## Choose an operation
 
 - List saved workflows: call `GET /workflows/`.
 - Inspect a version or stable group: call `GET /workflows/?all_versions=true` and filter the returned definitions by `id` or `scenario_group_id`.
 - Discover valid node types: call `GET /workflows/integrations`.
-- Connect Gmail: use [references/gmail.md](references/gmail.md) before building a Gmail node.
-- Connect Google Sheets: use [references/google-sheets.md](references/google-sheets.md) before building a Sheets node.
+- List or select integration connections: use [references/integrations.md](references/integrations.md), then the selected provider reference.
+- Connect Gmail or build a Gmail node: read [references/integrations.md](references/integrations.md), then [references/gmail.md](references/gmail.md).
+- Connect Google Sheets or build a Sheets node: read [references/integrations.md](references/integrations.md), then [references/google-sheets.md](references/google-sheets.md).
 - Create a workflow: call `POST /workflows/` with a complete JSON definition and acknowledged automatic service effects.
 - Update a definition: call `POST /workflows/` with the stable `scenario_group_id`, a complete JSON definition, and acknowledged automatic service effects.
 - Change saved status: call `PUT /workflows/{scenario_id}/status` with a version `id`; activating requires separate explicit confirmation.
 - Delete or run a workflow: state that the operation is outside this skill and do nothing.
-
-## Reuse OAuth connections before authorizing
-
-For Gmail, Google Sheets, and every future OAuth-backed integration with a
-documented Studio connection surface, always perform connection discovery
-before creating an authorization link:
-
-1. List the provider's saved connections through its documented Studio route.
-2. Present the connections whose public `status` is `active`, using
-   `display_name` and `provider_identity` (the connected account email when
-   available). Keep each opaque `connection_id` mapped to the displayed choice.
-3. Ask whether the user wants one of those existing connections or a new one.
-4. Reuse the selected active connection immediately. Create a connect link only
-   after the user chooses a new connection; do not create one preemptively.
-5. After new authorization, read the connection again and continue only when it
-   reports `active`.
-
-Do not present `needs_reauth` or `not_accessible` connections as ready to use.
-Report their status separately when useful. If there are no active connections,
-say so and offer the new-connection flow. Never invent connection routes for a
-future provider; use only its published reference and live public contract.
 
 ## Before changing a definition
 

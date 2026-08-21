@@ -3,7 +3,7 @@
 ## Contents
 
 - Discover the live contract
-- Authorize and manage a connection
+- Google Sheets connection behavior
 - Shared input and metadata meanings
 - Batch get values
 - Batch get values by data filter
@@ -23,82 +23,52 @@ The OpenAPI action entry supplies `action_name`, `mutates`, `manual_execution_al
 
 The production schema can be cross-checked at `https://api.puente.xyz/openapi.json`. The authenticated integrations catalog still controls which nodes are currently selectable for the Studio key's environment.
 
-## Authorize and manage a connection
+## Google Sheets connection behavior
 
-Use `X-API-Key: <STUDIO_KEY>` for every route below. The Studio key supplies company, team, and user identity. Never put it in browser code, a published application, a URL, or a report, and never ask for or infer another `equipo_id`.
+First follow the shared discovery, selection, readiness, and authorization flow
+in [integrations.md](integrations.md). Google Sheets uses:
 
-1. Before creating any authorization link, discover the team's saved Google
-   Sheets connections with:
+- action prefix `google_sheets.*`;
+- connection provider `google-sheets`;
+- `GET /studio/integrations/connections?provider=google-sheets` to list
+  connections;
+- `GET /studio/integrations/connections/{connection_id}?provider=google-sheets`
+  to read one connection;
+- `DELETE /studio/integrations/connections/{connection_id}?provider=google-sheets`
+  to disconnect only when requested.
 
-   ```http
-   GET /studio/integrations/connections?provider=google-sheets
-   X-API-Key: <STUDIO_KEY>
-   ```
+Only after the user chooses a new Google Sheets connection, create its link:
 
-   Each public record contains `connection_id`, `provider`, `display_name`,
-   `provider_identity`, `status`, `team_id`, `created_at`, and `updated_at`.
-   `provider_identity` is the connected Google account email when available.
+```http
+POST /studio/integrations/google-sheets/connect-link
+X-API-Key: <STUDIO_KEY>
+Content-Type: application/json
 
-2. Show the records whose `status` is exactly `active`, using a numbered list
-   when there is more than one:
+{"display_name":"Finance Sheets"}
+```
 
-   ```text
-   Google Sheets connections ready to use:
-   1. Finance Sheets — finance@example.com
-   2. Operations Sheets — operations@example.com
+The body is optional. `display_name` is an optional human-facing label of at
+most 120 characters. The response contains:
 
-   Would you like to use an existing connection or create a new one?
-   ```
+- `connection_id`: opaque Puente identifier for this team-scoped connection;
+- `connect_link`: short-lived authorization URL;
+- `expires_at`: time at which that authorization link expires.
 
-   If `provider_identity` is `null`, show only `display_name`; never invent an
-   email. Retain the opaque `connection_id` behind each displayed choice. Do not
-   present `needs_reauth` or `not_accessible` records as ready. If there are no
-   active records, say so and offer to create a new connection.
+After either selecting an existing active connection or authorizing a new one,
+verify access to the intended spreadsheet. `spreadsheet` is the spreadsheet ID
+or supported Google Sheets URL to probe:
 
-3. If the user chooses an existing connection, inspect it with
-   `GET /studio/integrations/connections/{connection_id}?provider=google-sheets`
-   and continue only while its public `status` remains `active`.
+```http
+POST /studio/integrations/connections/{connection_id}/verify
+X-API-Key: <STUDIO_KEY>
+Content-Type: application/json
 
-4. Only if the user chooses a new connection, create a short-lived authorization
-   link:
+{"spreadsheet":"<spreadsheet ID or Google Sheets URL>"}
+```
 
-   ```http
-   POST /studio/integrations/google-sheets/connect-link
-   X-API-Key: <STUDIO_KEY>
-   Content-Type: application/json
-
-   {"display_name":"Finance Sheets"}
-   ```
-
-   The body is optional; `display_name` is an optional human-facing label of at most 120 characters. The response contains:
-
-   - `connection_id`: opaque Puente identifier for this team-scoped connection;
-   - `connect_link`: short-lived URL the user opens in a browser to authorize Google;
-   - `expires_at`: time at which that authorization link expires.
-
-5. Show `connect_link` directly in chat without logging it. Ask the user to
-   complete Google authorization in their browser and reply when done. Do not
-   poll or change a workflow while waiting, and do not treat link creation alone
-   as successful authorization.
-6. After the user replies, inspect the new connection by its returned
-   `connection_id`. Continue only when its public `status` is `active`.
-7. For either a reused or newly authorized active connection, verify that it can
-   access the intended spreadsheet. `spreadsheet` is the spreadsheet ID or
-   supported Google Sheets URL to probe:
-
-   ```http
-   POST /studio/integrations/connections/{connection_id}/verify
-   X-API-Key: <STUDIO_KEY>
-   Content-Type: application/json
-
-   {"spreadsheet":"<spreadsheet ID or Google Sheets URL>"}
-   ```
-
-8. Only when the user requests disconnection, call `DELETE /studio/integrations/connections/{connection_id}?provider=google-sheets`. Success is `204 No Content`.
-
-`connection_id` is not a Google token, provider connection ID, or email address. Treat it as an opaque literal scoped to the Studio key's team. It does not support workflow-value interpolation. Never expose underlying provider credentials.
-
-Keep the authorization interaction in chat; do not hand the user terminal commands. A failed spreadsheet probe does not authorize changing the connection or workflow.
+An access probe does not alter connection status. A failed probe does not
+authorize changing, replacing, or disconnecting the connection. A requested
+disconnect succeeds with `204 No Content`.
 
 ## Shared input and metadata meanings
 

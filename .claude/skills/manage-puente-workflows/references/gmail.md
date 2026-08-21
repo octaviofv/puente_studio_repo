@@ -3,7 +3,7 @@
 ## Contents
 
 - Discover the live contract
-- Authorize and manage a connection
+- Gmail connection behavior
 - Editor behavior
 - Shared input rules
 - Normalized message output
@@ -26,72 +26,43 @@ The OpenAPI action entry supplies `action_name`, `mutates`, `manual_execution_al
 
 The production schema can be cross-checked at `https://api.puente.xyz/openapi.json`. The authenticated integrations catalog still controls which nodes are currently selectable for the Studio key's environment.
 
-## Authorize and manage a connection
+## Gmail connection behavior
 
-Use `X-API-Key: <STUDIO_KEY>` for every route below. The Studio key supplies company, team, and user identity. Never put it in browser code, a published application, a URL, or a report, and never send an `equipo_id` selector.
+First follow the shared discovery, selection, readiness, and authorization flow
+in [integrations.md](integrations.md). Gmail uses:
 
-1. Before creating any authorization link, discover the team's saved Gmail
-   connections with:
+- action prefix `gmail.*`;
+- connection provider `gmail`;
+- `GET /studio/integrations/connections?provider=gmail` to list connections;
+- `GET /studio/integrations/connections/{connection_id}?provider=gmail` to read
+  one connection;
+- `DELETE /studio/integrations/connections/{connection_id}?provider=gmail` to
+  disconnect only when requested.
 
-   ```http
-   GET /studio/integrations/connections?provider=gmail
-   X-API-Key: <STUDIO_KEY>
-   ```
+An existing Gmail connection is ready when its public status is `active`. There
+is no Gmail variant of the Studio spreadsheet-verification request; do not call
+`/verify` for Gmail.
 
-   Each public record contains `connection_id`, `provider`, `display_name`,
-   `provider_identity`, `status`, `team_id`, `created_at`, and `updated_at`.
-   `provider_identity` is the connected Gmail account email when available.
+Only after the user chooses a new Gmail connection, create its link:
 
-2. Show the records whose `status` is exactly `active`, using a numbered list
-   when there is more than one:
+```http
+POST /studio/integrations/gmail/connect-link
+X-API-Key: <STUDIO_KEY>
+Content-Type: application/json
 
-   ```text
-   Gmail connections ready to use:
-   1. Support Gmail — support@example.com
-   2. Billing Gmail — billing@example.com
+{"display_name":"Support Gmail"}
+```
 
-   Would you like to use an existing connection or create a new one?
-   ```
+The body is optional. `display_name` is an optional human-facing label of at
+most 120 characters. The response contains:
 
-   If `provider_identity` is `null`, show only `display_name`; never invent an
-   email. Retain the opaque `connection_id` behind each displayed choice. Do not
-   present `needs_reauth` or `not_accessible` records as ready. If there are no
-   active records, say so and offer to create a new connection.
+- `connection_id`: opaque Puente identifier for this team-scoped connection;
+- `connect_link`: short-lived authorization URL;
+- `expires_at`: time at which that authorization link expires.
 
-3. If the user chooses an existing connection, inspect it with
-   `GET /studio/integrations/connections/{connection_id}?provider=gmail` and use
-   it only while its public `status` remains `active`.
-
-4. Only if the user chooses a new connection, create a short-lived authorization
-   link:
-
-   ```http
-   POST /studio/integrations/gmail/connect-link
-   X-API-Key: <STUDIO_KEY>
-   Content-Type: application/json
-
-   {"display_name":"Support Gmail"}
-   ```
-
-   The body is optional. `display_name` is an optional human-facing label of at most 120 characters. The response contains:
-
-   - `connection_id`: opaque Puente identifier for this team-scoped connection;
-   - `connect_link`: short-lived URL the user opens in a browser to authorize Gmail;
-   - `expires_at`: time at which that authorization link expires.
-
-5. Show `connect_link` directly in chat without logging it. Ask the user to
-   complete Google authorization in their browser and reply when done. Do not
-   poll or change a workflow while waiting, and do not treat link creation alone
-   as successful authorization.
-6. After the user replies, inspect the new connection by its returned
-   `connection_id`. Continue only when its public `status` is `active`. A
-   connection may instead report `needs_reauth` or `not_accessible`; report that
-   state and offer a fresh authorization link.
-7. Only when the user requests disconnection, call `DELETE /studio/integrations/connections/{connection_id}?provider=gmail`. Success is `204 No Content`.
-
-There is no Gmail variant of the Studio spreadsheet-verification request. Do not call `/verify` for Gmail.
-
-`connection_id` is not a Google token, provider connection ID, email address, or workflow reference. Treat it as an opaque literal scoped to the Studio key's team. Never expose underlying provider credentials.
+After link creation, return to the shared flow in [integrations.md](integrations.md).
+A Gmail connection may report `needs_reauth` or `not_accessible`; do not present
+either state as ready. A requested disconnect succeeds with `204 No Content`.
 
 ## Editor behavior
 

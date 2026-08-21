@@ -5,9 +5,6 @@
 - Scope
 - Configuration and authentication
 - Available actions
-- Gmail connection actions
-- Google Sheets connection actions
-- OAuth connection-first interaction
 - Payloads
 - Node definitions
 - Definition-management flows
@@ -33,55 +30,13 @@ Send `X-API-Key: <STUDIO_KEY>` on every request. The credential supplies the com
 | Action | Method and path | Notes |
 |---|---|---|
 | Integration catalog | `GET /workflows/integrations` | Use to discover valid `node_id` values and their public input schemas. |
-| Create Gmail link | `POST /studio/integrations/gmail/connect-link` | Body is optional; when present, it may contain only `display_name`. Returns `connection_id`, `connect_link`, and `expires_at`. |
-| List Gmail connections | `GET /studio/integrations/connections?provider=gmail` | Returns public connection records for the credential's team. |
-| Read Gmail connection | `GET /studio/integrations/connections/{connection_id}?provider=gmail` | Inspect one opaque team-scoped connection. |
-| Disconnect Gmail | `DELETE /studio/integrations/connections/{connection_id}?provider=gmail` | User-requested disconnect; success is `204 No Content`. |
-| Create Google Sheets link | `POST /studio/integrations/google-sheets/connect-link` | Body is optional; when present, it may contain only `display_name`. Returns `connection_id`, `connect_link`, and `expires_at`. |
-| List Google Sheets connections | `GET /studio/integrations/connections?provider=google-sheets` | Returns public connection records for the credential's team. |
-| Read Google Sheets connection | `GET /studio/integrations/connections/{connection_id}?provider=google-sheets` | Inspect one opaque team-scoped connection. |
-| Verify Google Sheet access | `POST /studio/integrations/connections/{connection_id}/verify` | Send a spreadsheet ID or supported Google Sheets URL; access probes do not alter credential status. |
-| Disconnect Google Sheets | `DELETE /studio/integrations/connections/{connection_id}?provider=google-sheets` | User-requested disconnect; success is `204 No Content`. |
 | List definitions | `GET /workflows/` | Latest version per group by default. |
 | List version history | `GET /workflows/?all_versions=true` | Used to inspect a version or group locally. |
 | Create definition | `POST /workflows/` | Omit `scenario_group_id`; acknowledge automatic service effects. |
 | Create updated version | `POST /workflows/` | Include `scenario_group_id`, the complete definition, and acknowledged side effects. |
 | Change saved status | `PUT /workflows/{scenario_id}/status` | Use a version ID; activation requires explicit confirmation. |
 
-No other workflow-definition action is part of this skill.
-
-## Gmail connection actions
-
-The Gmail routes are Studio-key-only. Gmail nodes use an opaque, team-scoped `connection_id`. Read [gmail.md](gmail.md) for the authorization flow and exact connection and action contracts. Never substitute a JWT, pass `equipo_id`, log a connect link, or expose a provider session token or identifier. Gmail has no Studio connection-verification request: inspect the public connection status and continue only when it is `active`. These routes do not expand the workflow-definition surface above; `manual_execution_allowed` metadata does not authorize this skill to call workflow execution endpoints.
-
-## Google Sheets connection actions
-
-The Google Sheets routes are Studio-key-only. Google Sheets nodes use an opaque, team-scoped `connection_id`. Read [google-sheets.md](google-sheets.md) for the authorization flow and exact connection and action contracts. Never substitute a JWT, pass `equipo_id`, log a connect link, or expose a provider session token or identifier. These routes do not expand the workflow-definition surface above; `manual_execution_allowed` metadata does not authorize this skill to call workflow execution endpoints.
-
-## OAuth connection-first interaction
-
-Before calling any provider's connect-link endpoint, call its documented
-connection-list endpoint and filter the public response to `status: "active"`.
-For each ready connection, show the user:
-
-```text
-<display_name> — <provider_identity>
-```
-
-`provider_identity` is the connected account email when the provider supplies
-one. If it is `null`, show `display_name` without inventing an email. Number the
-choices when needed, retain the corresponding opaque `connection_id`, and ask
-whether to reuse one or create a new connection. Do not show a connection as
-ready unless its public status is exactly `active`.
-
-Only call a connect-link endpoint after the user chooses the new-connection
-path. Then show the returned short-lived link, wait for the user to complete
-authorization, and read the new connection's public status. Link creation alone
-does not establish a usable connection.
-
-This ordering applies to Gmail, Google Sheets, and future OAuth-backed
-integrations that publish equivalent Studio routes. It does not authorize
-guessing provider names, routes, response fields, or connection semantics.
+No other workflow-definition action is part of this skill. Connection management is documented separately in [integrations.md](integrations.md); provider action contracts remain in [gmail.md](gmail.md) and [google-sheets.md](google-sheets.md).
 
 ## Node definitions
 
