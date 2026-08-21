@@ -30,8 +30,20 @@ The integrations response is the source of truth for:
 - node catalog versions and display metadata.
 
 The public `GET /openapi.json` contract is the source of truth for the
-persisted `WorkflowNode` shape. Use it when a requested workflow needs a
-top-level node field that is not an integration input, such as `script_code`.
+persisted `WorkflowNode` and `ScenarioCreate` shapes. Its top-level
+`x-puente-integration-actions` map publishes action contracts keyed by
+`node_id`. Each entry can include:
+
+- `action_name`: human-readable action name;
+- `mutates`: whether the action writes provider state;
+- `manual_execution_allowed`: whether the editor may execute the node by itself;
+- `input_schema`: exact runtime-validation JSON Schema;
+- `output_schema`: fields the action publishes to downstream workflow context;
+- `vue_input_schema`: editor-oriented input controls and reference support.
+
+Use OpenAPI for output fields and top-level node fields such as `script_code`.
+`manual_execution_allowed` is metadata, not permission for this management
+skill to call a non-public execution endpoint.
 
 Never depend on internal backend code, migrations, database rows, private templates, or hard-coded node lists. Never invent a `node_id` or an input field.
 
@@ -48,7 +60,7 @@ curl -fsS "${BASE_URL%/}/workflows/integrations" \
   jq 'sort_by(.type, .category, .app_name) | group_by(.type) | map({type: .[0].type, nodes: map({node_id, app_name, action_name, category})})'
 ```
 
-Choose a node by its `node_id`, `app_name`, `action_name`, `type`, and `category`. Do not infer unsupported behavior from the type name alone. Read its `input_schema` before constructing `inputs`.
+Choose a node by its `node_id`, `app_name`, `action_name`, `type`, and `category`. Do not infer unsupported behavior from the type name alone. Read its `input_schema` before constructing `inputs`. When OpenAPI has an `x-puente-integration-actions[node_id]` entry, require the same `node_id` to exist in both surfaces before authoring the node; use the authenticated catalog as the saved/selectable node authority and the OpenAPI extension for runtime and output detail.
 
 ## Catalog response
 
@@ -85,7 +97,7 @@ Common `input_schema` metadata includes:
 - `label` and `description`: user-facing guidance;
 - conditional display metadata when one field depends on another.
 
-Only use fields present in the returned schema. Internal implementation fields are intentionally unavailable through this interface.
+Only use fields present in the returned schema. Integration inputs are exact contracts, and extra fields can be rejected. Internal implementation fields are intentionally unavailable through this interface.
 
 ## Saved node shape
 
@@ -153,7 +165,7 @@ label="selected_action", index_position=1 -> selected_action_1
 
 When the whole input value is one reference, the referenced value can remain an object, array, number, boolean, or string. Embedded references become text.
 
-The public integrations catalog does not provide a formal output schema. Do not guess output field names. Use references already present in a saved workflow, output information explicitly supplied by the user, or output behavior documented through another approved public Puente interface.
+The integrations catalog describes saved/selectable inputs; formal action outputs are published separately in `GET /openapi.json` under `x-puente-integration-actions[node_id].output_schema`. Cross-check the `node_id` in both surfaces before using those fields. When no output schema is published for an action, do not guess output field names; use references already present in a saved workflow or output behavior documented through another approved public Puente interface.
 
 Keep labels and indexes unique and stable. If either changes, update every corresponding reference and edge.
 
@@ -183,28 +195,6 @@ decrypted. Do not rely on partial rows.
 This input does not change the Studio table API or a published application's
 table API: those ordinary reads continue to return `kms:v1:...` ciphertext.
 
-## Google Sheets nodes and chat OAuth
-
-Use this section only after `GET /workflows/integrations` returns the desired
-Google Sheets action. The live catalog is authoritative for the exact
-`node_id`, required inputs, and input names.
-
-Do not invent `connection_id`, `spreadsheet`, or `range` fields. Create a
-connection through `POST /studio/integrations/google-sheets/connect-link` with
-no request body, then show
-the returned link to the user, and wait for their external-browser consent and
-**Done** reply. Check the returned opaque connection with
-`GET /studio/integrations/connections/{connection_id}` before asking for the
-literal Google Sheet URL. Verify that URL with
-`POST /studio/integrations/connections/{connection_id}/verify`.
-
-Only after the connection is `active` and access is verified may a definition
-use the opaque `connection_id` and literal sheet reference, and only when the
-selected live catalog schema supports them. Never use a CLI command, a team
-argument, a session token, Nango ID, credential, or authorization URL as a
-workflow value. Keep the workflow as a complete `draft` definition/version
-until the author provides the required explicit confirmation.
-
 ## Edges
 
 Edges use workflow context keys, not catalog `node_id` values:
@@ -224,11 +214,13 @@ Do not use edges to invent branching, looping, or execution behavior that is not
 
 1. Request `GET /workflows/integrations` and use its returned catalog.
 2. Select only a returned `node_id`.
-3. Build `inputs` only from that entry's `input_schema`. For a Python script,
+3. When OpenAPI publishes `x-puente-integration-actions[node_id]`, cross-check
+   the same ID and read its runtime input/output schemas and action metadata.
+4. Build `inputs` only from the exact action contract. For a Python script,
    separately validate the top-level `script_code` field in `GET /openapi.json`.
-4. Ask for every missing required operational value.
-5. Default `on_error` to `stop`.
-6. Keep new or changed workflows in `draft` unless activation is explicitly requested and confirmed.
-7. Show the complete method, path, and JSON payload before sending a create/version request when confirmation is needed.
-8. Preserve complete saved nodes and edges when creating a new version.
-9. Never call workflow execution, trigger, webhook, schedule, or deletion endpoints.
+5. Ask for every missing required operational value.
+6. Default `on_error` to `stop`.
+7. Keep new or changed workflows in `draft` unless activation is explicitly requested and confirmed.
+8. Show the complete method, path, and JSON payload before sending a create/version request when confirmation is needed.
+9. Preserve complete saved nodes and edges when creating a new version.
+10. Never call workflow execution, trigger, webhook, schedule, or deletion endpoints.

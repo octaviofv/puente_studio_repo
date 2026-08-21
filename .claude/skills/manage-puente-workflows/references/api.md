@@ -5,6 +5,7 @@
 - Scope
 - Configuration and authentication
 - Available actions
+- Google Sheets connection actions
 - Payloads
 - Node definitions
 - Definition-management flows
@@ -23,27 +24,29 @@ BASE_URL=<base_url>
 STUDIO_KEY=<puente_studio_placeholder>
 ```
 
-Send `X-API-Key: <STUDIO_KEY>` on every request. The credential selects and restricts the team. Omit `equipo_id` unless the API payload requires it; if supplied, it must be the credential's team.
+Send `X-API-Key: <STUDIO_KEY>` on every request. The credential supplies the company, team, and user identity. Omit `equipo_id` normally; never request, infer, or supply another team's ID.
 
 ## Available actions
 
 | Action | Method and path | Notes |
 |---|---|---|
 | Integration catalog | `GET /workflows/integrations` | Use to discover valid `node_id` values and their public input schemas. |
-| Create Google Sheets link | `POST /studio/integrations/google-sheets/connect-link` | Send no request body. Returns only `connection_id`, `connect_link`, and `expires_at`. Never include a team ID. |
+| Create Google Sheets link | `POST /studio/integrations/google-sheets/connect-link` | Body is optional; when present, it may contain only `display_name`. Returns `connection_id`, `connect_link`, and `expires_at`. |
 | List Google Sheets connections | `GET /studio/integrations/connections?provider=google-sheets` | Returns public connection records for the credential's team. |
-| Read Google Sheets connection | `GET /studio/integrations/connections/{connection_id}` | Check status after the user replies Done. |
-| Verify Google Sheet access | `POST /studio/integrations/connections/{connection_id}/verify` | Send one literal spreadsheet URL; reference probes do not alter credential status. |
+| Read Google Sheets connection | `GET /studio/integrations/connections/{connection_id}?provider=google-sheets` | Inspect one opaque team-scoped connection. |
+| Verify Google Sheet access | `POST /studio/integrations/connections/{connection_id}/verify` | Send a spreadsheet ID or supported Google Sheets URL; access probes do not alter credential status. |
+| Disconnect Google Sheets | `DELETE /studio/integrations/connections/{connection_id}?provider=google-sheets` | User-requested disconnect; success is `204 No Content`. |
 | List definitions | `GET /workflows/` | Latest version per group by default. |
 | List version history | `GET /workflows/?all_versions=true` | Used to inspect a version or group locally. |
 | Create definition | `POST /workflows/` | Omit `scenario_group_id`; acknowledge automatic service effects. |
 | Create updated version | `POST /workflows/` | Include `scenario_group_id`, the complete definition, and acknowledged side effects. |
 | Change saved status | `PUT /workflows/{scenario_id}/status` | Use a version ID; activation requires explicit confirmation. |
 
-No other workflow action is part of this skill.
+No other workflow-definition action is part of this skill.
 
-The Google Sheets endpoints are Studio-key-only. Never substitute a JWT, pass
-`equipo_id`, log a connect link, or expose a Nango session token or identifier.
+## Google Sheets connection actions
+
+The Google Sheets routes are Studio-key-only. Google Sheets nodes use an opaque, team-scoped `connection_id`. Read [google-sheets.md](google-sheets.md) for the authorization flow and exact connection and action contracts. Never substitute a JWT, pass `equipo_id`, log a connect link, or expose a provider session token or identifier. These routes do not expand the workflow-definition surface above; `manual_execution_allowed` metadata does not authorize this skill to call workflow execution endpoints.
 
 ## Node definitions
 
@@ -77,14 +80,26 @@ Read [nodes.md](nodes.md) for the external node contract, public catalog fields,
 
 Required fields are `nombre` and `nodes`. Saved statuses are `draft`, `active`, and `inactive`.
 
-Each node accepts:
+`ScenarioCreate` fields mean:
 
-- `label`: base label.
-- `node_id`: value returned by integrations.
-- `inputs`: node-specific object.
-- `on_error`: normally `stop` or `continue`.
-- `position`: optional visual coordinates.
-- `index_position`: optional canvas index used to construct references and edge endpoints.
+- `nombre` (required): human-readable workflow name.
+- `nodes` (required): complete ordered array of `WorkflowNode` objects.
+- `descripcion` (optional): human-readable description.
+- `equipo_id` (optional): owning team. Omit it so the Studio key's team is used; never target another team.
+- `status` (optional, default `draft`): saved lifecycle state: `draft`, `active`, or `inactive`.
+- `scenario_group_id` (optional): stable group ID whose next version is being created. Omit it for a new workflow.
+- `edges` (optional): complete visual/execution connections between node context keys.
+- `current_scenario_id` (optional): current version identifier when supplied by the caller's versioning flow; preserve it from an existing complete payload rather than inventing it.
+
+Each `WorkflowNode` accepts:
+
+- `label` (required): base label used to form the saved node's context key.
+- `node_id` (required): exact value discovered through integrations and cross-checked in OpenAPI action metadata when available.
+- `inputs` (optional, default `{}`): exact action-specific input object. Additional fields can be rejected.
+- `script_code` (optional): top-level Python source for a supported code node; it is not an integration input.
+- `on_error` (optional, default `stop`): `stop` ends the workflow on node failure; use `continue` only when requested.
+- `position` (optional): visual-editor coordinates or metadata.
+- `index_position` (optional): canvas index used to construct references and edge endpoints.
 
 The compatible context-key convention from the supplied guide is `label_index_position` when an index exists, otherwise `label`. Edges connect those context keys. Validate node IDs against the integrations response.
 
