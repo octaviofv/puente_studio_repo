@@ -1,6 +1,6 @@
 ---
 name: manage-puente-workflows
-description: Manage Puente workflow definitions and connection-backed workflow integrations from puente_studio_repo with the repository STUDIO_KEY. Use when an external Puente Studio user needs to configure Gmail or Google Sheets connections and nodes, reuse or authorize an integration account, inspect workflows, create a draft or complete new version, connect nodes and edges, or change a saved workflow version's status. Disclose automatic webhook and scheduling side effects, require explicit activation confirmation, and never call workflow run endpoints.
+description: Manage Puente workflow definitions and connection-backed workflow integrations from puente_studio_repo with the repository STUDIO_KEY. Use when an external Puente Studio user needs to configure Gmail or Google Sheets connections and nodes, reuse or authorize an integration account, inspect workflows, create a draft or complete new version, connect nodes and edges, or change a saved workflow version's status. Disclose automatic Puente webhook and scheduling side effects, require explicit activation confirmation, and never call workflow run endpoints.
 ---
 
 # Manage Puente Workflows
@@ -44,7 +44,7 @@ For any connection-backed integration, first read [references/integrations.md](r
 2. Validate every `node_id` through `GET /workflows/integrations`; never invent node types. When the request involves node-level code, inspect `GET /openapi.json` too: `script_code` is a persisted `WorkflowNode` field, not an integration `inputs` field.
 3. Preserve the complete `nodes` and `edges` arrays when creating a new version.
 4. Default new definitions and versions to `draft` unless the user explicitly requests another saved status.
-5. Explain that `POST /workflows/` automatically generates or inherits synchronous-webhook metadata, inherits scheduling metadata on new versions, and attempts Hookdeck webhook provisioning.
+5. Explain that `POST /workflows/` automatically generates or inherits Puente synchronous-webhook metadata and inherits scheduling metadata on new versions. This can expose a fixed Puente webhook endpoint even while the workflow remains a draft.
 6. Obtain explicit user confirmation of those effects before sending a create/version request.
 7. If any create/version payload uses `status: "active"`, obtain separate explicit confirmation of activation.
 8. Show the intended HTTP method, path, and JSON body without sending it when the requested change is ambiguous or needs confirmation.
@@ -64,6 +64,35 @@ Treat `scenario_group_id` as the stable workflow identity and `id` as one saved 
 - Expect the new version to have `is_latest=true`.
 
 The Studio credential is bound to one team. Omit `equipo_id` to use that team. Never attempt another team ID.
+
+## Build workflow URLs
+
+Treat the configured API origin as the source of truth. The only supported
+origins for user-facing webhook links are:
+
+- Production: `https://api.puente.xyz`
+- Staging: `https://staging.puente.xyz`
+
+After a successful create or version write and read-back:
+
+1. Use `sync_webhook_id` to build the Puente webhook endpoint as
+   `{api_origin}/workflows/webhook/{sync_webhook_id}`.
+2. Prefer that derived endpoint over the response's legacy `webhook_url`.
+3. Never rewrite the endpoint to another webhook host or report a webhook
+   subdomain. If the configured origin is not one of the two supported origins,
+   do not invent or expose an external webhook URL.
+4. Distinguish the webhook endpoint from the workflow editor URL. They serve
+   different purposes.
+5. For production only, build the frontend editor URL as
+   `https://app.puente.xyz/workflows/{scenario_group_id}/edit` and show it as a
+   clickable link. The UUID is the stable `scenario_group_id`, not the saved
+   version `id`.
+6. For staging, report the Puente staging webhook endpoint when available, but
+   do not invent a staging frontend host or substitute the production editor
+   URL unless a current public contract documents that mapping.
+
+If `sync_webhook_id` or `scenario_group_id` is absent, state that the
+corresponding URL could not be derived instead of guessing.
 
 ## Distinguish management from execution
 
@@ -131,5 +160,16 @@ Report the HTTP outcome and these non-secret fields:
 - `is_latest`
 - `status`
 - `equipo_id`
+- `sync_webhook_id` when returned
+
+After a successful complete workflow create, also report:
+
+- The Puente webhook endpoint derived from the configured API origin and
+  `sync_webhook_id`, when both are valid.
+- The production frontend editor URL derived from `scenario_group_id` when the
+  configured origin is `https://api.puente.xyz`.
+
+Label these links clearly so the user is not given a webhook endpoint when they
+ask to open the workflow project in the frontend.
 
 Preserve API error status and detail. Do not expose request headers or credentials.
