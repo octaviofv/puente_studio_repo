@@ -5,6 +5,7 @@
 - Discover the live contract
 - Google Sheets connection behavior
 - Shared input and metadata meanings
+- Search rows (advanced)
 - Batch get values
 - Batch get values by data filter
 - Create spreadsheet row
@@ -72,7 +73,7 @@ disconnect succeeds with `204 No Content`.
 
 ## Shared input and metadata meanings
 
-All four actions below currently have `manual_execution_allowed: true`. Always rediscover this metadata before relying on it.
+All five actions documented below currently have `manual_execution_allowed: true`. Always rediscover this metadata before relying on it.
 
 - `connection_id` (required): literal opaque Puente connection ID obtained through the lifecycle above; no workflow interpolation.
 - `spreadsheet` (required): spreadsheet ID, supported Google Sheets URL, or a resolved workflow reference.
@@ -81,6 +82,69 @@ All four actions below currently have `manual_execution_allowed: true`. Always r
 - `date_time_render_option` (optional, default `SERIAL_NUMBER`): `SERIAL_NUMBER` returns numeric date/time serials; `FORMATTED_STRING` returns formatted text. Google ignores this setting when `value_render_option` is `FORMATTED_VALUE`.
 
 Downstream nodes reference an output through the saved context key described in [nodes.md](nodes.md), for example `{{read_ranges_1.spreadsheet_id}}`.
+
+## Search rows (advanced)
+
+`google_sheets.search_rows_by_query` is displayed as **Search Rows (Advanced)**. It is read-only (`mutates: false`) and filters rows with the Google Visualization API Query Language.
+
+Inputs in addition to `connection_id` and `spreadsheet`:
+
+- `sheet_name` (required): non-empty visible tab name.
+- `query` (required): non-empty query from 1 to 8,192 characters. Google query syntax has no `from` clause. Use column letters and single-quoted string literals, for example `select * where A = 'hola'`.
+- `range` (optional, default `null`): non-empty A1 range when supplied, such as `A1:F1000`. It limits the data queried within `sheet_name`; omit it to query the selected tab without a narrower range.
+- `limit` (optional integer, default `1000`, minimum `1`): maximum number of rows the action may return. The public input contract does not define a fixed maximum, so values greater than `1000` are accepted.
+
+If `query` has no `limit N` clause, the action applies the `limit` field to the query. If `query` already has a `limit N` clause, that clause is preserved. The `limit` field still caps the number of rows the action accepts: keep a query-level limit at or below the field value, or the action can fail if the query returns more rows than the field allows. The action does not silently truncate an oversized result.
+
+The first row is treated as column headers and is not returned as data. Use a real header row; otherwise the first data row will be interpreted as headers and omitted.
+
+Safe node example:
+
+```json
+{
+  "label": "search_greeting",
+  "node_id": "google_sheets.search_rows_by_query",
+  "inputs": {
+    "connection_id": "conn_example_opaque",
+    "spreadsheet": "https://docs.google.com/spreadsheets/d/example-sheet-id/edit",
+    "sheet_name": "Customers",
+    "query": "select A, B where A = 'Pepe'",
+    "limit": 2500
+  },
+  "on_error": "stop",
+  "index_position": 1
+}
+```
+
+The action output schema is:
+
+```json
+{
+  "data": [
+    {
+      "A": "Pepe",
+      "B": "Gonzales"
+    }
+  ]
+}
+```
+
+A standalone execution response places that action output under `result`:
+
+```json
+{
+  "result": {
+    "data": [
+      {
+        "A": "Pepe",
+        "B": "Gonzales"
+      }
+    ]
+  }
+}
+```
+
+Rows are objects keyed by the returned column identifiers such as `A` and `B`. Missing cells are `null`; dates, datetimes, and times are normalized to ISO-formatted strings. No matches return `{"data":[]}`. Omitting `limit` uses the `1000`-row default; supplying a larger value allows more than 1,000 rows when the result fits within the 5 MiB response-size constraint. A response that exceeds that constraint fails instead of returning a partial list. Narrow the query or `range`, or batch the work, when a large result may exceed it.
 
 ## Batch get values
 
