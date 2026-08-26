@@ -1,34 +1,47 @@
-# Puente Studio — Dev Kit
+# Puente Studio
 
-Kit de desarrollo local para crear y gestionar aplicaciones web dentro de **Puente OS**.  
-Incluye scripts Node.js para bajar y subir artefactos.
+Workspace de ejemplo para crear aplicaciones web en **Puente OS**.
 
-Para documentación de agentes, revisa [`AGENTS.md`](./AGENTS.md).
+Las habilidades y herramientas para administrar aplicaciones, artefactos y workflows ya no se mantienen en este repositorio. Instálalas desde el marketplace oficial [`puente-os/agent-skills`](https://github.com/puente-os/agent-skills).
 
----
+## Instalar en Claude Code
 
-## Requisitos
+Ejecuta estos comandos dentro de Claude Code:
 
-- Node.js 14+ (sin dependencias externas)
-- Cuenta activa en [app.puente.xyz](https://app.puente.xyz)
-- Una **Platform API Key** generada desde Configuración
+```text
+/plugin marketplace add puente-os/agent-skills
+/plugin install puente-os@skills
+```
 
----
+Reinicia Claude Code después de la instalación.
 
-## Setup
+## Instalar en Codex
 
 ```bash
-# 1. Clona el repo
-git clone <url-del-repo>
-cd puente_studio_repo
+codex plugin marketplace add puente-os/agent-skills
+codex plugin add puente-os@skills
+```
 
-# 2. Crea tu archivo de entorno
+Inicia una nueva tarea de Codex después de la instalación.
+
+## Habilidades disponibles
+
+- `puente-studio`: crea y administra aplicaciones, artefactos, tablas e integraciones de Puente Studio.
+- `manage-puente-workflows`: administra definiciones, nodos, versiones e integraciones de workflows.
+
+Los scripts `pull_artefacto.js` y `files_to_json.js` vienen incluidos en `puente-studio` y trabajan con `app/files`, `app/output.json` y el archivo `.env` del proyecto actual.
+
+## Configuración del proyecto
+
+```bash
 cp .env.example .env
 ```
 
-Edita `.env` y completa tu `STUDIO_KEY`:
+Completa las variables requeridas sin guardar credenciales en Git:
 
 ```env
 BASE_URL=<base_url>
 STUDIO_KEY=<puente_studio_placeholder>
 ```
+
+Consulta el [marketplace oficial](https://github.com/puente-os/agent-skills) para instrucciones de actualización y la documentación vigente.
