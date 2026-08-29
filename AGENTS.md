@@ -8,6 +8,7 @@ This repository contains the Puente Studio development kit and native Agent Skil
 
 - Use `puente-studio` for work involving Puente applications, artifacts, tables, integrations, local development, validation, or publication.
 - Use `manage-puente-workflows` for work involving workflow definitions, nodes, edges, versions, activation, schedules, or webhooks.
+- Use `manage-puente-projects` for work involving projects, workspace folders, grouping components into a project, or a project's Kanban task board.
 - Read the selected skill completely before acting.
 - When a task involves both areas, load both skills.
 
@@ -34,10 +35,12 @@ puente_studio_repo/
 ├── CLAUDE.md                    ← Loads AGENTS.md
 ├── .claude/skills/              ← Claude Code production skill copies
 │   ├── puente-studio/
-│   └── manage-puente-workflows/
+│   ├── manage-puente-workflows/
+│   └── manage-puente-projects/
 ├── .agents/skills/              ← Codex skill copies
 │   ├── puente-studio/
-│   └── manage-puente-workflows/
+│   ├── manage-puente-workflows/
+│   └── manage-puente-projects/
 └── app/
     ├── files/                   ← Application source files
     ├── json_result/             ← Generated JSON output
@@ -162,3 +165,24 @@ Never use `STUDIO_KEY` inside published application source code.
 | Regenerate API key | POST | `/studio/artefactos/{id}/api-key/regenerate` |
 | Grant table access | POST | `/studio/artefactos/{id}/tablas-acceso` |
 | Revoke table access | DELETE | `/studio/artefactos/{id}/tablas-acceso/{tabla_id}` |
+
+## Projects and tasks
+
+These endpoints hang off `/proyectos`, **not** `/studio/proyectos`. The Studio key
+creates, edits and organizes but never deletes: the three DELETE routes reject it
+with 401 by design, and deletion happens in the web interface. To take a component
+out of a project, move it with `proyecto_id_destino: null` instead.
+
+| Action | Method | Endpoint |
+|---|---|---|
+| Workspace overview (components + tasks) | GET | `/proyectos/all_components` |
+| List projects | GET | `/proyectos` |
+| Create project | POST | `/proyectos` |
+| Update project | PUT | `/proyectos/{proyecto_id}` |
+| List tasks | GET | `/proyectos/{proyecto_id}/tareas` |
+| Create task | POST | `/proyectos/{proyecto_id}/tareas` |
+| Update task | PUT | `/proyectos/{proyecto_id}/tareas/{tarea_id}` |
+| Move task on the board | PUT | `/proyectos/{proyecto_id}/tareas/{tarea_id}/estado` |
+| Assign components | POST | `/proyectos/{proyecto_id}/componentes` |
+| Move or unassign a component | PUT | `/proyectos/componentes/mover` |
+| **Delete project, task, or assignment** | — | Not available with `STUDIO_KEY` |
